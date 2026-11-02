@@ -42,6 +42,7 @@ func InitDB() error {
 			&models.TestService{},
 			&models.TestRequest{},
 			&models.ActivityLog{},
+			&models.BimtekMagangApplication{},
 		)
 		if err != nil {
 			return err
@@ -86,6 +87,7 @@ func InitDB() error {
 		&models.TestService{},
 		&models.TestRequest{},
 		&models.ActivityLog{},
+		&models.BimtekMagangApplication{},
 	)
 	if err != nil {
 		return err

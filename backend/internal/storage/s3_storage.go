@@ -69,6 +69,10 @@ func (s *S3DocumentStorage) SaveRegistrationDocument(ctx context.Context, fileHe
 	return s.saveMultipartFile(ctx, "registration-docs", fileHeader)
 }
 
+func (s *S3DocumentStorage) SaveBimtekMagangDocument(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+	return s.saveMultipartFile(ctx, "bimtek-magang", fileHeader)
+}
+
 func (s *S3DocumentStorage) SaveSubmissionAttachment(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
 	return s.saveMultipartFile(ctx, "submission-attachments", fileHeader)
 }

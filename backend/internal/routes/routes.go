@@ -19,6 +19,7 @@ type Dependencies struct {
 	TestServiceHandler  *handlers.TestServiceHandler
 	BillingHandler      *handlers.BillingHandler
 	ActivityLogHandler  *handlers.ActivityLogHandler
+	BimtekMagangHandler *handlers.BimtekMagangHandler
 }
 
 func mustDependency[T any](name string, dep T) T {
@@ -40,7 +41,8 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies) {
 	testServiceHandler := mustDependency("test service handler", deps.TestServiceHandler)
 	billingHandler := mustDependency("billing handler", deps.BillingHandler)
 	activityLogHandler := mustDependency("activity log handler", deps.ActivityLogHandler)
-	
+	bimtekMagangHandler := mustDependency("bimtek/magang handler", deps.BimtekMagangHandler)
+
 	// Serve uploaded files from the Docker volume mount point.
 	// This path must match LOCAL_UPLOAD_DIR and the volume mount in docker-compose.yml.
 	uploadDir := "/app/uploads"
@@ -127,6 +129,8 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies) {
 
 				adminGroup.GET("/submissions/:id/lhu", lhuHandler.GetLHU)
 				adminGroup.POST("/submissions/:id/lhu", lhuHandler.UploadLHU)
+				adminGroup.GET("/bimtek-magang", bimtekMagangHandler.GetAllApplications)
+				adminGroup.GET("/bimtek-magang/:id/documents/:document", bimtekMagangHandler.GetDocument)
 
 				adminGroup.GET("/feedbacks", feedbackHandler.GetAllFeedbacks)
 				adminGroup.GET("/feedbacks/:id", feedbackHandler.GetFeedbackByID)
@@ -148,6 +152,8 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies) {
 				customerGroup.PATCH("/notifications/read-all", notificationHandler.MarkAllNotificationsAsRead)
 
 				customerGroup.POST("/submissions", submissionHandler.CreateSubmission)
+				customerGroup.POST("/bimtek-magang", bimtekMagangHandler.Create)
+				customerGroup.GET("/bimtek-magang/my", bimtekMagangHandler.GetMyApplications)
 				customerGroup.GET("/submissions/samples/template", submissionHandler.DownloadSampleTemplate)
 				customerGroup.POST("/submissions/:submission_id/samples/import", submissionHandler.ImportSampleTemplate)
 				customerGroup.GET("/submissions/my", submissionHandler.GetMySubmissions)

@@ -22,6 +22,7 @@ import (
 
 type DocumentStorage interface {
 	SaveRegistrationDocument(ctx context.Context, fileHeader *multipart.FileHeader) (string, error)
+	SaveBimtekMagangDocument(ctx context.Context, fileHeader *multipart.FileHeader) (string, error)
 	SaveSubmissionAttachment(ctx context.Context, fileHeader *multipart.FileHeader) (string, error)
 	SaveBillingProof(ctx context.Context, fileHeader *multipart.FileHeader) (string, error)
 	SaveComplaintAttachment(ctx context.Context, fileHeader *multipart.FileHeader) (string, error)
@@ -44,6 +45,10 @@ func NewLocalDocumentStorage(baseDir string) *LocalDocumentStorage {
 
 func (s *LocalDocumentStorage) SaveRegistrationDocument(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
 	return s.saveMultipartFile(ctx, "registration-docs", fileHeader)
+}
+
+func (s *LocalDocumentStorage) SaveBimtekMagangDocument(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+	return s.saveMultipartFile(ctx, "bimtek-magang", fileHeader)
 }
 
 func (s *LocalDocumentStorage) SaveSubmissionAttachment(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
@@ -192,6 +197,10 @@ func NewGCSDocumentStorage(ctx context.Context, bucketName string, credentialsFi
 
 func (s *GCSDocumentStorage) SaveRegistrationDocument(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
 	return s.saveMultipartFile(ctx, "registration-docs", fileHeader)
+}
+
+func (s *GCSDocumentStorage) SaveBimtekMagangDocument(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+	return s.saveMultipartFile(ctx, "bimtek-magang", fileHeader)
 }
 
 func (s *GCSDocumentStorage) SaveBillingProof(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {

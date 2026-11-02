@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { isAuthenticated, getUser } from "../utils/auth";
 
 import Login          from "../pages/auth/Login";
@@ -56,9 +56,12 @@ import PengajuanSaya      from "../pages/customer/PengajuanSaya";
 import DetailPengajuan    from "../pages/customer/DetailPengajuan";
 import PenilaianKepuasan  from "../pages/customer/PenilaianKepuasan";
 import PengajuanUjiSampel from "../pages/customer/PengajuanUjiSampel";
+import CustomerBimtekMagang from "../pages/customer/BimtekMagang";
+import BimtekMagangApplications from "../pages/admin/BimtekMagang";
 
 function PrivateRoute({ children, allowedRoles }) {
-  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!isAuthenticated()) return <Navigate to="/login" state={{ from: location }} replace />;
   const user = getUser();
   const role = (user?.role ?? "").toLowerCase();
   if (allowedRoles && !allowedRoles.includes(role)) return <Navigate to="/login" replace />;
@@ -86,6 +89,7 @@ export default function AppRoutes() {
         <Route path="registrasi-pelanggan"         element={<RegistrasiPelanggan />} />
         <Route path="registrasi-pelanggan/:id"     element={<DetailPelanggan />} />
         <Route path="pengajuan-masuk"              element={<AdminPengajuanMasuk />} />
+        <Route path="bimtek-magang"                element={<BimtekMagangApplications />} />
         <Route path="pengajuan-masuk/detail/:id"   element={<AdminDetailPengajuan />} />
         <Route path="proses-pengujian"             element={<AdminProsesPengujian />} />
         <Route path="laporan-hasil-uji"            element={<AdminLaporanHasilUji />} />
@@ -104,6 +108,7 @@ export default function AppRoutes() {
         <Route path="registrasi-pelanggan"         element={<SuperAdminRegistrasiPelanggan />} />
         <Route path="registrasi-pelanggan/:id"     element={<SuperAdminDetailPelanggan />} />
         <Route path="pengajuan-masuk"              element={<SuperAdminPengajuanMasuk />} />
+        <Route path="bimtek-magang"                element={<BimtekMagangApplications />} />
         <Route path="pengajuan-masuk/detail/:id"   element={<SuperAdminDetailPengajuan />} />
         <Route path="proses-pengujian"             element={<SuperAdminProsesPengujian />} />
         <Route path="laporan-hasil-uji"            element={<SuperAdminLaporanHasilUji />} />
@@ -126,6 +131,7 @@ export default function AppRoutes() {
         <Route path="katalog-pengujian/lab/:unit"  element={<KatalogPerLab />} />
         <Route path="keranjang"                    element={<Keranjang />} />
         <Route path="pengajuan-uji-sampel"         element={<PengajuanUjiSampel />} />
+        <Route path="bimtek-magang"                element={<CustomerBimtekMagang />} />
         <Route path="pengajuan-saya"               element={<PengajuanSaya />} />
         <Route path="pengajuan-saya/:id"           element={<DetailPengajuan />} />
         <Route path="penilaian/:id"                element={<PenilaianKepuasan />} />
