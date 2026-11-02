@@ -37,9 +37,9 @@ func NewRouter() *gin.Engine {
 	}
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: allowedOrigins,
-		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowOrigins:     allowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,
 	}))
 
@@ -55,6 +55,7 @@ func NewRouter() *gin.Engine {
 		TestServiceHandler:  handlers.NewTestServiceHandlerWithDefault(),
 		BillingHandler:      handlers.NewBillingHandlerWithStorage(uploadStorage),
 		ActivityLogHandler:  handlers.NewActivityLogHandler(services.NewActivityLogService()),
+		BimtekMagangHandler: handlers.NewBimtekMagangHandler(uploadStorage),
 	})
 
 	return r

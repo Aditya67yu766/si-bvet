@@ -14,6 +14,12 @@ export const rejectUser = (userId) =>
 export const getAdminSubmissions = (params = "") =>
   apiFetch(`/admin/submissions${params}`);
 
+export const getBimtekMagangApplications = () =>
+  apiFetch("/admin/bimtek-magang");
+
+export const getBimtekMagangDocument = (id, document) =>
+  apiFetch(`/admin/bimtek-magang/${id}/documents/${document}`);
+
 export const approveSubmission = (id) =>
   apiFetch(`/admin/submissions/${id}/approve`, { method: "PATCH" });
 

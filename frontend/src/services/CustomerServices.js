@@ -4,6 +4,15 @@ import { apiFetch } from "./api";
 export const getMySubmissions = () =>
   apiFetch("/customer/submissions/my");
 
+export const getMyBimtekMagangApplications = () =>
+  apiFetch("/customer/bimtek-magang/my");
+
+export const createBimtekMagangApplication = (formData) =>
+  apiFetch("/customer/bimtek-magang", {
+    method: "POST",
+    body: formData,
+  });
+
 // Notifikasi
 export const getNotifications = () =>
   apiFetch("/customer/notifications");

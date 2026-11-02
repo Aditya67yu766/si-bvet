@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import InputField from "../../components/InputField";
 import { saveAuth, getDashboardPath } from "../../utils/auth";
 import logo from "../../assets/logo.png";
@@ -24,6 +24,7 @@ const BASE_URL = (
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [form, setForm]         = useState({ email: "", password: "" });
   const [showPass, setShowPass] = useState(false);
   const [errors, setErrors]     = useState({});
@@ -59,7 +60,11 @@ export default function LoginPage() {
       }
       const { token, user } = data;
       saveAuth(token, user);
-      navigate(getDashboardPath(user.role), { replace: true });
+      const requestedPath = location.state?.from?.pathname;
+      const destination = user.role === "customer" && requestedPath?.startsWith("/customer/")
+        ? requestedPath
+        : getDashboardPath(user.role);
+      navigate(destination, { replace: true });
     } catch (err) {
       setApiError(err.message ?? "Terjadi kesalahan. Coba lagi.");
     } finally {

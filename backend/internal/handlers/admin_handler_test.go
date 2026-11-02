@@ -25,6 +25,10 @@ func (f failingDocumentStorage) SaveRegistrationDocument(ctx context.Context, fi
 	return "", nil
 }
 
+func (f failingDocumentStorage) SaveBimtekMagangDocument(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+	return "", nil
+}
+
 func (f failingDocumentStorage) SaveSubmissionAttachment(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
 	return "", nil
 }
