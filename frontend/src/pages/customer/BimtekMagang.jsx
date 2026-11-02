@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import {
   createBimtekMagangApplication,
   getMyBimtekMagangApplications,
+  getMyBimtekMagangReplyLetter,
 } from "../../services/CustomerServices";
+import { API_BASE_URL } from "../../services/api";
 
 const DOCUMENTS = [
   { name: "identity_document", label: "KTP / KTM / Identitas Pengenal" },
@@ -113,6 +115,26 @@ export default function BimtekMagang() {
       setError(err.message ?? "Gagal mengirim pengajuan.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openReplyLetter = async (application) => {
+    const preview = window.open("about:blank", "_blank");
+    if (!preview) {
+      setError("Izinkan pop-up di browser untuk membuka surat balasan.");
+      return;
+    }
+    setError("");
+    try {
+      const response = await getMyBimtekMagangReplyLetter(application.id);
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error ?? "Gagal membuka surat balasan.");
+      const apiBase = new URL(API_BASE_URL, window.location.origin);
+      preview.opener = null;
+      preview.location.href = new URL(json.data.url, apiBase).href;
+    } catch (err) {
+      preview.close();
+      setError(err.message ?? "Gagal membuka surat balasan.");
     }
   };
 
@@ -234,8 +256,26 @@ export default function BimtekMagang() {
                   </p>
                   <p className="mt-1 text-sm text-gray-700">{application.topic}</p>
                   <p className="mt-1 text-xs text-gray-500">Dikirim {formatDate(application.created_at)}</p>
+                  {application.review_note && (
+                    <p className="mt-2 text-sm text-red-700">
+                      Catatan petugas: {application.review_note}
+                    </p>
+                  )}
                 </div>
-                <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800">{application.status}</span>
+                <div className="flex flex-col items-end gap-2">
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    application.status === "Berkas Terverifikasi" ? "bg-green-100 text-green-800"
+                      : application.status === "Berkas Tidak Terverifikasi" ? "bg-red-100 text-red-700"
+                        : application.status === "Surat Balasan Terkirim" ? "bg-blue-100 text-blue-800"
+                          : "bg-yellow-100 text-yellow-800"
+                  }`}>{application.status}</span>
+                  {application.reply_letter_available && (
+                    <button type="button" onClick={() => openReplyLetter(application)}
+                      className="rounded-lg bg-[#233B6E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a2d56]">
+                      Lihat Surat Balasan Perizinan
+                    </button>
+                  )}
+                </div>
               </article>
             ))}
           </div>

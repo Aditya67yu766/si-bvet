@@ -316,8 +316,14 @@ function Services() {
             className="flex gap-5 overflow-x-auto pb-3 snap-x snap-mandatory
             [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-          {SERVICES.map((s, i) => (
-            <div key={i} onClick={() => s.href ? window.location.assign(s.href) : navigate(s.title === "BIMTEK / Magang" ? "/customer/bimtek-magang" : s.title === "Pengaduan" ? "/pengaduan" : s.title === "Penilaian" ? "/penilaian" : "/login")}
+          {SERVICES.map((s, i) => {
+            const Card = s.href ? "a" : "div";
+            return (
+            <Card key={i}
+              href={s.href}
+              target={s.href ? "_blank" : undefined}
+              rel={s.href ? "noopener noreferrer" : undefined}
+              onClick={s.href ? undefined : () => navigate(s.title === "BIMTEK / Magang" ? "/customer/bimtek-magang" : s.title === "Pengaduan" ? "/pengaduan" : s.title === "Penilaian" ? "/penilaian" : "/login")}
               className="card-hover bg-white rounded-2xl border border-[#D3D6DB]/50 shadow-sm overflow-hidden cursor-pointer group
                 flex-shrink-0 w-[75vw] sm:w-[calc(50%-10px)] lg:w-[calc(25%-15px)] snap-start">
               <div className="h-1.5 bg-[#F5C400]" />
@@ -341,8 +347,8 @@ function Services() {
                   </svg>
                 </div>
               </div>
-            </div>
-          ))}
+            </Card>
+          );})}
           </div>
 
           {/* Panah geser - muncul saat hover, penanda bisa digeser */}

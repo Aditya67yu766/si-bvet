@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getBimtekMagangApplications,
   getBimtekMagangDocument,
+  reviewBimtekMagangApplication,
+  sendBimtekMagangReplyLetter,
 } from "../../services/adminServices";
 import { API_BASE_URL } from "../../services/api";
 
@@ -26,6 +28,9 @@ export default function BimtekMagangApplications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [downloading, setDownloading] = useState("");
+  const [reviewNotes, setReviewNotes] = useState({});
+  const [replyFiles, setReplyFiles] = useState({});
+  const [actioning, setActioning] = useState("");
 
   const loadApplications = useCallback(async () => {
     try {
@@ -86,6 +91,56 @@ export default function BimtekMagangApplications() {
     }
   };
 
+  const reviewApplication = async (application, verified) => {
+    const note = (reviewNotes[application.id] ?? "").trim();
+    if (!verified && !note) {
+      setError("Isi alasan berkas tidak terverifikasi terlebih dahulu.");
+      return;
+    }
+    const key = `${application.id}-review`;
+    setActioning(key);
+    setError("");
+    try {
+      const response = await reviewBimtekMagangApplication(application.id, { verified, note });
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error ?? "Gagal menyimpan verifikasi.");
+      setReviewNotes((current) => ({ ...current, [application.id]: "" }));
+      await loadApplications();
+    } catch (err) {
+      setError(err.message ?? "Gagal menyimpan verifikasi.");
+    } finally {
+      setActioning("");
+    }
+  };
+
+  const sendReplyLetter = async (application) => {
+    const file = replyFiles[application.id];
+    if (!file) {
+      setError("Pilih surat balasan PDF yang akan dikirim.");
+      return;
+    }
+    if (file.size === 0 || file.size > 10 * 1024 * 1024) {
+      setError("Surat balasan harus berukuran maksimal 10 MB.");
+      return;
+    }
+    const key = `${application.id}-reply`;
+    setActioning(key);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("reply_letter", file);
+      const response = await sendBimtekMagangReplyLetter(application.id, formData);
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error ?? "Gagal mengirim surat balasan.");
+      setReplyFiles((current) => ({ ...current, [application.id]: null }));
+      await loadApplications();
+    } catch (err) {
+      setError(err.message ?? "Gagal mengirim surat balasan.");
+    } finally {
+      setActioning("");
+    }
+  };
+
   return (
     <div className="space-y-5">
       <header>
@@ -110,6 +165,7 @@ export default function BimtekMagangApplications() {
                   <th className="px-4 py-3">Periode</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Dokumen</th>
+                  <th className="px-4 py-3">Tindakan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -134,9 +190,19 @@ export default function BimtekMagangApplications() {
                         {formatDate(application.start_date)} – {formatDate(application.end_date)}
                       </td>
                       <td className="px-4 py-4">
-                        <span className="inline-flex rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800">
+                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                          application.status === "Berkas Terverifikasi" ? "bg-green-100 text-green-800"
+                            : application.status === "Berkas Tidak Terverifikasi" ? "bg-red-100 text-red-700"
+                              : application.status === "Surat Balasan Terkirim" ? "bg-blue-100 text-blue-800"
+                                : "bg-yellow-100 text-yellow-800"
+                        }`}>
                           {application.status}
                         </span>
+                        {application.review_note && (
+                          <p className="mt-2 max-w-[220px] text-xs text-red-700">
+                            Catatan: {application.review_note}
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex flex-col items-start gap-2">
@@ -151,7 +217,57 @@ export default function BimtekMagangApplications() {
                               </button>
                             );
                           })}
+                          {application.reply_letter_available && (
+                            <button type="button"
+                              disabled={downloading === `${application.id}-reply-letter`}
+                              onClick={() => downloadDocument(application, { key: "reply-letter", label: "Surat Balasan" })}
+                              className="text-left text-xs font-bold text-green-700 underline decoration-green-300 underline-offset-2 disabled:opacity-50">
+                              {downloading === `${application.id}-reply-letter` ? "Membuka..." : "Lihat Surat Balasan"}
+                            </button>
+                          )}
                         </div>
+                      </td>
+                      <td className="min-w-[240px] px-4 py-4">
+                        {application.status === "Menunggu Verifikasi" ? (
+                          <div className="space-y-2">
+                            <textarea value={reviewNotes[application.id] ?? ""}
+                              onChange={(event) => setReviewNotes((current) => ({
+                                ...current,
+                                [application.id]: event.target.value,
+                              }))}
+                              maxLength={2000}
+                              placeholder="Alasan jika berkas tidak terverifikasi"
+                              className="w-full rounded-lg border border-gray-300 p-2 text-xs focus:border-[#415F9D] focus:outline-none" />
+                            <div className="flex flex-wrap gap-2">
+                              <button type="button" disabled={actioning === `${application.id}-review`}
+                                onClick={() => reviewApplication(application, true)}
+                                className="rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white hover:bg-green-800 disabled:opacity-50">
+                                Verifikasi
+                              </button>
+                              <button type="button" disabled={actioning === `${application.id}-review`}
+                                onClick={() => reviewApplication(application, false)}
+                                className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50">
+                                Tidak Terverifikasi
+                              </button>
+                            </div>
+                          </div>
+                        ) : application.status === "Berkas Terverifikasi" ? (
+                          <div className="space-y-2">
+                            <input type="file" accept=".pdf,application/pdf"
+                              onChange={(event) => setReplyFiles((current) => ({
+                                ...current,
+                                [application.id]: event.target.files?.[0] ?? null,
+                              }))}
+                              className="block w-full text-xs text-gray-600 file:mr-2 file:rounded-md file:border-0 file:bg-[#EEF0F8] file:px-2 file:py-1.5 file:font-semibold file:text-[#233B6E]" />
+                            <button type="button" disabled={actioning === `${application.id}-reply`}
+                              onClick={() => sendReplyLetter(application)}
+                              className="rounded-lg bg-[#233B6E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a2d56] disabled:opacity-50">
+                              {actioning === `${application.id}-reply` ? "Mengirim..." : "Kirim Surat Balasan"}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">Tidak ada tindakan tersedia.</span>
+                        )}
                       </td>
                     </tr>
                   );

@@ -20,6 +20,19 @@ export const getBimtekMagangApplications = () =>
 export const getBimtekMagangDocument = (id, document) =>
   apiFetch(`/admin/bimtek-magang/${id}/documents/${document}`);
 
+export const reviewBimtekMagangApplication = (id, data) =>
+  apiFetch(`/admin/bimtek-magang/${id}/review`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+export const sendBimtekMagangReplyLetter = (id, formData) =>
+  apiFetch(`/admin/bimtek-magang/${id}/reply-letter`, {
+    method: "POST",
+    body: formData,
+  });
+
 export const approveSubmission = (id) =>
   apiFetch(`/admin/submissions/${id}/approve`, { method: "PATCH" });
 

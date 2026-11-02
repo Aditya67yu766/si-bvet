@@ -1,10 +1,13 @@
 package services
 
 import (
+	"errors"
 	"si-bvet/internal/models"
 	"si-bvet/internal/repositories"
 	"time"
 )
+
+var ErrBimtekMagangApplicationStateConflict = errors.New("status pengajuan tidak mendukung tindakan ini")
 
 type BimtekMagangApplicationInput struct {
 	RequestType      string
@@ -44,4 +47,30 @@ func GetAllBimtekMagangApplications() ([]models.BimtekMagangApplication, error) 
 
 func GetBimtekMagangApplicationByID(id uint) (*models.BimtekMagangApplication, error) {
 	return repositories.GetBimtekMagangApplicationByID(id)
+}
+
+func ReviewBimtekMagangApplication(id uint, verified bool, note string) error {
+	if !verified && note == "" {
+		return errors.New("alasan berkas tidak terverifikasi wajib diisi")
+	}
+	if verified {
+		note = ""
+	}
+	err := repositories.ReviewBimtekMagangApplication(id, verified, note, time.Now())
+	if errors.Is(err, repositories.ErrBimtekMagangApplicationStateConflict) {
+		return ErrBimtekMagangApplicationStateConflict
+	}
+	return err
+}
+
+func SendBimtekMagangReplyLetter(id uint, filePath string) error {
+	err := repositories.SendBimtekMagangReplyLetter(id, filePath, time.Now())
+	if errors.Is(err, repositories.ErrBimtekMagangApplicationStateConflict) {
+		return ErrBimtekMagangApplicationStateConflict
+	}
+	return err
+}
+
+func GetBimtekMagangReplyLetterByUser(id, userID uint) (*models.BimtekMagangApplication, error) {
+	return repositories.GetBimtekMagangReplyLetterByUser(id, userID)
 }

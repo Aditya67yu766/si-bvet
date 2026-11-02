@@ -7,6 +7,7 @@ import (
 	"si-bvet/internal/routes"
 	"si-bvet/internal/services"
 	"si-bvet/internal/storage"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -31,9 +32,16 @@ func NewRouter() *gin.Engine {
 	allowedOrigins := []string{
 		"http://localhost:3000",
 		"http://127.0.0.1:3000",
+		"https://sibvet-lampung.online",
+		"https://www.sibvet-lampung.online",
 	}
 	if frontendURL := os.Getenv("FRONTEND_URL"); frontendURL != "" {
-		allowedOrigins = append(allowedOrigins, frontendURL)
+		for _, origin := range strings.Split(frontendURL, ",") {
+			origin = strings.TrimSpace(origin)
+			if origin != "" {
+				allowedOrigins = append(allowedOrigins, origin)
+			}
+		}
 	}
 
 	r.Use(cors.New(cors.Config{

@@ -131,6 +131,8 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies) {
 				adminGroup.POST("/submissions/:id/lhu", lhuHandler.UploadLHU)
 				adminGroup.GET("/bimtek-magang", bimtekMagangHandler.GetAllApplications)
 				adminGroup.GET("/bimtek-magang/:id/documents/:document", bimtekMagangHandler.GetDocument)
+				adminGroup.PATCH("/bimtek-magang/:id/review", bimtekMagangHandler.Review)
+				adminGroup.POST("/bimtek-magang/:id/reply-letter", bimtekMagangHandler.SendReplyLetter)
 
 				adminGroup.GET("/feedbacks", feedbackHandler.GetAllFeedbacks)
 				adminGroup.GET("/feedbacks/:id", feedbackHandler.GetFeedbackByID)
@@ -154,6 +156,7 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies) {
 				customerGroup.POST("/submissions", submissionHandler.CreateSubmission)
 				customerGroup.POST("/bimtek-magang", bimtekMagangHandler.Create)
 				customerGroup.GET("/bimtek-magang/my", bimtekMagangHandler.GetMyApplications)
+				customerGroup.GET("/bimtek-magang/:id/reply-letter", bimtekMagangHandler.GetMyReplyLetter)
 				customerGroup.GET("/submissions/samples/template", submissionHandler.DownloadSampleTemplate)
 				customerGroup.POST("/submissions/:submission_id/samples/import", submissionHandler.ImportSampleTemplate)
 				customerGroup.GET("/submissions/my", submissionHandler.GetMySubmissions)

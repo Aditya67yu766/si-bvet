@@ -7,6 +7,9 @@ export const getMySubmissions = () =>
 export const getMyBimtekMagangApplications = () =>
   apiFetch("/customer/bimtek-magang/my");
 
+export const getMyBimtekMagangReplyLetter = (id) =>
+  apiFetch(`/customer/bimtek-magang/${id}/reply-letter`);
+
 export const createBimtekMagangApplication = (formData) =>
   apiFetch("/customer/bimtek-magang", {
     method: "POST",
