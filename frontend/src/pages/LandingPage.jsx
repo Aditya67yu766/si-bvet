@@ -68,7 +68,7 @@ const STATS = [
 const CONTACTS = [
   { label: "Alamat",           val: "Jl. Untung Suropati No.2, Rajabasa, Bandar Lampung 35144" },
   { label: "Email",            val: "bvetlampung@pertanian.go.id" },
-  { label: "Telepon",          val: "(0721) 783852" },
+  { label: "Telepon",          val: "+62 813-7923-0195" },
   { label: "Jam Operasional",  val: "Senin – Jumat: 07.30 – 16.00 WIB" },
 ];
 
@@ -582,7 +582,7 @@ function Footer() {
             <h4 className="text-white text-sm font-bold uppercase tracking-widest mb-5">Kontak</h4>
             <ul className="space-y-3 text-sm text-white/55">
               <li className="leading-relaxed">Jl. Untung Suropati No.2, Rajabasa, Bandar Lampung 35144</li>
-              <li><a href="tel:+62721783852" className="hover:text-[#F5C400] transition-colors">(0721) 783852</a></li>
+              <li><a href="tel:+62721783852" className="hover:text-[#F5C400] transition-colors">+62 813-7923-0195</a></li>
               <li><a href="mailto:bvetlampung@pertanian.go.id" className="hover:text-[#F5C400] transition-colors break-all">bvetlampung@pertanian.go.id</a></li>
               <li>Senin – Jumat: 07.30 – 16.00 WIB</li>
             </ul>
