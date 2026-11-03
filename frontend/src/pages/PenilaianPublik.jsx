@@ -3,11 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
 import FormPenilaian from "../components/FormPenilaian";
 
-export default function PenilaianPublik() {
-  const navigate = useNavigate();
-  const [success, setSuccess] = useState(false);
-
-  const PageHeader = () => (
+function PageHeader() {
+  return (
     <div className="bg-[#233B6E] h-[68px] flex items-center px-5 sm:px-8">
       <div className="w-full flex items-center">
         <Link to="/" className="flex items-center gap-3">
@@ -22,6 +19,12 @@ export default function PenilaianPublik() {
       </div>
     </div>
   );
+}
+
+export default function PenilaianPublik() {
+  const navigate = useNavigate();
+  const [success, setSuccess] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
   if (success) {
     return (
@@ -70,13 +73,137 @@ export default function PenilaianPublik() {
     );
   }
 
+  if (!showForm) {
+    return (
+      <div className="min-h-screen bg-[#F0F2F8]">
+        <PageHeader />
+        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8">
+          <div className="flex items-center gap-3 mb-6">
+            <button
+              onClick={() => navigate(-1)}
+              className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 flex-shrink-0"
+              title="Kembali"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-5 h-5"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-[#233B6E]">Penilaian</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Pilih jenis penilaian yang ingin Anda isi.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <a
+              href="https://docs.google.com/forms/d/e/1FAIpQLScs6M1-htaE-gEOtJ0WbdG3DVqi1DKaQzDVbWTb9Z6_ahBCRA/viewform"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 hover:shadow-md hover:border-[#233B6E]/40 transition-all"
+            >
+              <div className="w-12 h-12 rounded-xl bg-[#233B6E] text-white flex items-center justify-center mb-5">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-6 h-6"
+                  aria-hidden="true"
+                >
+                  <path d="M12 3 14.8 8.7l6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-bold text-[#233B6E]">
+                Indeks Kepuasan Masyarakat (IKM)
+              </h2>
+              <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                Isi penilaian IKM melalui formulir eksternal.
+              </p>
+              <span className="inline-flex items-center gap-2 mt-5 text-sm font-bold text-[#233B6E]">
+                Isi Form IKM
+                <svg
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-4 h-4"
+                  aria-hidden="true"
+                >
+                  <path d="M6 3h7v7M13 3 6 10" />
+                  <path d="M11 9v4H3V5h4" />
+                </svg>
+              </span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="text-left bg-white rounded-2xl border border-gray-200 shadow-sm p-6 hover:shadow-md hover:border-[#233B6E]/40 transition-all"
+            >
+              <div className="w-12 h-12 rounded-xl bg-[#233B6E] text-white flex items-center justify-center mb-5">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-6 h-6"
+                  aria-hidden="true"
+                >
+                  <path d="M12 3 14.8 8.7l6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-bold text-[#233B6E]">
+                Penilaian Kepuasan Layanan
+              </h2>
+              <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                Sampaikan kepuasan Anda terhadap layanan BVET melalui rating
+                penilaian.
+              </p>
+              <span className="inline-flex items-center gap-2 mt-5 text-sm font-bold text-[#233B6E]">
+                Isi Penilaian
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-4 h-4"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F0F2F8]">
       <PageHeader />
       <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8">
         <div className="flex items-center gap-3 mb-6">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => setShowForm(false)}
             className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 flex-shrink-0"
             title="Kembali"
           >
