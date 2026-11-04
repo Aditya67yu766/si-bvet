@@ -27,6 +27,15 @@ export const reviewBimtekMagangApplication = (id, data) =>
     body: JSON.stringify(data),
   });
 
+export const verifyBimtekMagangApplicationWithReplyLetter = (id, formData) =>
+  apiFetch(`/admin/bimtek-magang/${id}/verify-with-reply-letter`, {
+    method: "POST",
+    body: formData,
+  });
+
+export const deleteBimtekMagangApplication = (id) =>
+  apiFetch(`/admin/bimtek-magang/${id}`, { method: "DELETE" });
+
 export const sendBimtekMagangReplyLetter = (id, formData) =>
   apiFetch(`/admin/bimtek-magang/${id}/reply-letter`, {
     method: "POST",

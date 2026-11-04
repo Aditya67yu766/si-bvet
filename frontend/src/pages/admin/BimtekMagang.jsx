@@ -3,9 +3,11 @@ import {
   getBimtekMagangApplications,
   getBimtekMagangDocument,
   reviewBimtekMagangApplication,
+  deleteBimtekMagangApplication,
+  verifyBimtekMagangApplicationWithReplyLetter,
   sendBimtekMagangReplyLetter,
 } from "../../services/adminServices";
-import { API_BASE_URL } from "../../services/api";
+import { resolveFileUrl } from "../../utils/fileUrl";
 
 const DOCUMENTS = [
   { key: "identity", label: "Identitas" },
@@ -31,6 +33,7 @@ export default function BimtekMagangApplications() {
   const [reviewNotes, setReviewNotes] = useState({});
   const [replyFiles, setReplyFiles] = useState({});
   const [actioning, setActioning] = useState("");
+  const [search, setSearch] = useState("");
 
   const loadApplications = useCallback(async () => {
     try {
@@ -80,9 +83,8 @@ export default function BimtekMagangApplications() {
         throw new Error(json.error ?? "Gagal mengunduh dokumen.");
       }
       const json = await response.json();
-      const apiBase = new URL(API_BASE_URL, window.location.origin);
       preview.opener = null;
-      preview.location.href = new URL(json.data.url, apiBase).href;
+      preview.location.href = resolveFileUrl(json.data.url);
     } catch (err) {
       preview.close();
       setError(err.message ?? "Gagal mengunduh dokumen.");
@@ -97,17 +99,34 @@ export default function BimtekMagangApplications() {
       setError("Isi alasan berkas tidak terverifikasi terlebih dahulu.");
       return;
     }
+    const replyFile = replyFiles[application.id];
+    if (verified && !replyFile) {
+      setError("Unggah surat balasan PDF sebelum memverifikasi pengajuan.");
+      return;
+    }
+    if (verified && (replyFile.size === 0 || replyFile.size > 10 * 1024 * 1024 || !replyFile.name.toLowerCase().endsWith(".pdf"))) {
+      setError("Surat balasan harus berupa PDF berukuran maksimal 10 MB.");
+      return;
+    }
     const key = `${application.id}-review`;
     setActioning(key);
     setError("");
     try {
-      const response = await reviewBimtekMagangApplication(application.id, { verified, note });
+      let response;
+      if (verified) {
+        const formData = new FormData();
+        formData.append("reply_letter", replyFile);
+        response = await verifyBimtekMagangApplicationWithReplyLetter(application.id, formData);
+      } else {
+        response = await reviewBimtekMagangApplication(application.id, { verified, note });
+      }
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error ?? "Gagal menyimpan verifikasi.");
+      if (!response.ok) throw new Error(json.error ?? "Gagal menyimpan verifikasi dan surat balasan.");
       setReviewNotes((current) => ({ ...current, [application.id]: "" }));
+      setReplyFiles((current) => ({ ...current, [application.id]: null }));
       await loadApplications();
     } catch (err) {
-      setError(err.message ?? "Gagal menyimpan verifikasi.");
+      setError(err.message ?? "Gagal menyimpan verifikasi dan surat balasan.");
     } finally {
       setActioning("");
     }
@@ -141,6 +160,40 @@ export default function BimtekMagangApplications() {
     }
   };
 
+  const deleteApplication = async (application) => {
+    if (!window.confirm("Yakin ingin menghapus pengajuan ini? Tindakan ini tidak dapat dibatalkan.")) {
+      return;
+    }
+    const key = `${application.id}-delete`;
+    setActioning(key);
+    setError("");
+    try {
+      const response = await deleteBimtekMagangApplication(application.id);
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error ?? "Gagal menghapus pengajuan.");
+      setApplications((current) => current.filter((item) => item.id !== application.id));
+    } catch (err) {
+      setError(err.message ?? "Gagal menghapus pengajuan.");
+    } finally {
+      setActioning("");
+    }
+  };
+
+  const normalizedSearch = search.trim().toLocaleLowerCase("id-ID");
+  const filteredApplications = applications.filter((application) => {
+    const user = application.user_info ?? {};
+    return [
+      user.fullname,
+      user.institution,
+      user.email,
+      user.phone,
+      application.request_type === "bimtek" ? "Bimbingan Teknis" : "Magang / Penelitian",
+      application.topic,
+      application.status,
+      application.review_note,
+    ].some((value) => String(value ?? "").toLocaleLowerCase("id-ID").includes(normalizedSearch));
+  });
+
   return (
     <div className="space-y-5">
       <header>
@@ -150,11 +203,24 @@ export default function BimtekMagangApplications() {
 
       {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
+      <label className="block">
+        <span className="sr-only">Cari pengajuan BIMTEK/Magang</span>
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Cari nama, instansi, jenis, topik, atau status..."
+          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 outline-none transition focus:border-[#415F9D] focus:ring-2 focus:ring-[#415F9D]/20"
+        />
+      </label>
+
       <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         {loading ? (
           <p className="p-6 text-sm text-gray-500">Memuat pengajuan...</p>
         ) : applications.length === 0 ? (
           <p className="p-6 text-sm text-gray-500">Belum ada pengajuan BIMTEK/Magang.</p>
+        ) : filteredApplications.length === 0 ? (
+          <p className="p-6 text-sm text-gray-500">Tidak ada pengajuan yang cocok dengan pencarian.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
@@ -169,7 +235,7 @@ export default function BimtekMagangApplications() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {applications.map((application) => {
+                {filteredApplications.map((application) => {
                   const user = application.user_info ?? {};
                   return (
                     <tr key={application.id} className="align-top">
@@ -228,46 +294,68 @@ export default function BimtekMagangApplications() {
                         </div>
                       </td>
                       <td className="min-w-[240px] px-4 py-4">
-                        {application.status === "Menunggu Verifikasi" ? (
-                          <div className="space-y-2">
-                            <textarea value={reviewNotes[application.id] ?? ""}
-                              onChange={(event) => setReviewNotes((current) => ({
-                                ...current,
-                                [application.id]: event.target.value,
-                              }))}
-                              maxLength={2000}
-                              placeholder="Alasan jika berkas tidak terverifikasi"
-                              className="w-full rounded-lg border border-gray-300 p-2 text-xs focus:border-[#415F9D] focus:outline-none" />
-                            <div className="flex flex-wrap gap-2">
-                              <button type="button" disabled={actioning === `${application.id}-review`}
-                                onClick={() => reviewApplication(application, true)}
-                                className="rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white hover:bg-green-800 disabled:opacity-50">
-                                Verifikasi
-                              </button>
-                              <button type="button" disabled={actioning === `${application.id}-review`}
-                                onClick={() => reviewApplication(application, false)}
-                                className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50">
-                                Tidak Terverifikasi
+                        <div className="space-y-3">
+                          {application.status === "Menunggu Verifikasi" ? (
+                            <div className="space-y-2">
+                              <textarea value={reviewNotes[application.id] ?? ""}
+                                onChange={(event) => setReviewNotes((current) => ({
+                                  ...current,
+                                  [application.id]: event.target.value,
+                                }))}
+                                maxLength={2000}
+                                placeholder="Alasan jika berkas tidak terverifikasi"
+                                className="w-full rounded-lg border border-gray-300 p-2 text-xs focus:border-[#415F9D] focus:outline-none" />
+                              <label className="block text-xs font-semibold text-[#233B6E]">
+                                Surat balasan PDF (wajib saat verifikasi)
+                                <input type="file" accept=".pdf,application/pdf"
+                                  onChange={(event) => setReplyFiles((current) => ({
+                                    ...current,
+                                    [application.id]: event.target.files?.[0] ?? null,
+                                  }))}
+                                  className="mt-1 block w-full text-xs font-normal text-gray-600 file:mr-2 file:rounded-md file:border-0 file:bg-[#EEF0F8] file:px-2 file:py-1.5 file:font-semibold file:text-[#233B6E]" />
+                              </label>
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button" disabled={actioning === `${application.id}-review`}
+                                  onClick={() => reviewApplication(application, true)}
+                                  className="rounded-lg bg-[#233B6E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a2d56] disabled:opacity-50">
+                                  Verifikasi
+                                </button>
+                                <button type="button" disabled={actioning === `${application.id}-review`}
+                                  onClick={() => reviewApplication(application, false)}
+                                  className="rounded-lg bg-[#F5C400] px-3 py-2 text-xs font-semibold text-[#233B6E] hover:bg-[#e0b300] disabled:opacity-50">
+                                  Tidak Terverifikasi
+                                </button>
+                              </div>
+                            </div>
+                          ) : application.status === "Berkas Terverifikasi" ? (
+                            <div className="space-y-2">
+                              <label className="block text-xs font-semibold text-[#233B6E]">
+                                Surat balasan PDF
+                                <input type="file" accept=".pdf,application/pdf"
+                                  onChange={(event) => setReplyFiles((current) => ({
+                                    ...current,
+                                    [application.id]: event.target.files?.[0] ?? null,
+                                  }))}
+                                  className="mt-1 block w-full text-xs font-normal text-gray-600 file:mr-2 file:rounded-md file:border-0 file:bg-[#EEF0F8] file:px-2 file:py-1.5 file:font-semibold file:text-[#233B6E]" />
+                              </label>
+                              <button type="button" disabled={actioning === `${application.id}-reply`}
+                                onClick={() => sendReplyLetter(application)}
+                                className="rounded-lg bg-[#233B6E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a2d56] disabled:opacity-50">
+                                {actioning === `${application.id}-reply` ? "Mengirim..." : "Kirim Surat Balasan"}
                               </button>
                             </div>
-                          </div>
-                        ) : application.status === "Berkas Terverifikasi" ? (
-                          <div className="space-y-2">
-                            <input type="file" accept=".pdf,application/pdf"
-                              onChange={(event) => setReplyFiles((current) => ({
-                                ...current,
-                                [application.id]: event.target.files?.[0] ?? null,
-                              }))}
-                              className="block w-full text-xs text-gray-600 file:mr-2 file:rounded-md file:border-0 file:bg-[#EEF0F8] file:px-2 file:py-1.5 file:font-semibold file:text-[#233B6E]" />
-                            <button type="button" disabled={actioning === `${application.id}-reply`}
-                              onClick={() => sendReplyLetter(application)}
-                              className="rounded-lg bg-[#233B6E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a2d56] disabled:opacity-50">
-                              {actioning === `${application.id}-reply` ? "Mengirim..." : "Kirim Surat Balasan"}
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">Tidak ada tindakan tersedia.</span>
-                        )}
+                          ) : (
+                            <span className="text-xs text-gray-400">Tidak ada tindakan tersedia.</span>
+                          )}
+                          <button
+                            type="button"
+                            disabled={actioning === `${application.id}-delete`}
+                            onClick={() => deleteApplication(application)}
+                            className="rounded-lg border border-[#233B6E] px-3 py-2 text-xs font-semibold text-[#233B6E] hover:bg-[#EEF0F8] disabled:opacity-50"
+                          >
+                            {actioning === `${application.id}-delete` ? "Menghapus..." : "Hapus pengajuan"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

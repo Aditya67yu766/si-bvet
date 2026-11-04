@@ -4,7 +4,7 @@ import {
   getMyBimtekMagangApplications,
   getMyBimtekMagangReplyLetter,
 } from "../../services/CustomerServices";
-import { API_BASE_URL } from "../../services/api";
+import { resolveFileUrl } from "../../utils/fileUrl";
 
 const DOCUMENTS = [
   { name: "identity_document", label: "KTP / KTM / Identitas Pengenal" },
@@ -129,9 +129,8 @@ export default function BimtekMagang() {
       const response = await getMyBimtekMagangReplyLetter(application.id);
       const json = await response.json();
       if (!response.ok) throw new Error(json.error ?? "Gagal membuka surat balasan.");
-      const apiBase = new URL(API_BASE_URL, window.location.origin);
       preview.opener = null;
-      preview.location.href = new URL(json.data.url, apiBase).href;
+      preview.location.href = resolveFileUrl(json.data.url);
     } catch (err) {
       preview.close();
       setError(err.message ?? "Gagal membuka surat balasan.");

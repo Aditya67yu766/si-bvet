@@ -8,6 +8,7 @@ import (
 )
 
 var ErrBimtekMagangApplicationStateConflict = errors.New("status pengajuan tidak mendukung tindakan ini")
+var ErrBimtekMagangReplyLetterRequired = errors.New("surat balasan wajib diunggah bersamaan dengan verifikasi")
 
 type BimtekMagangApplicationInput struct {
 	RequestType      string
@@ -49,14 +50,26 @@ func GetBimtekMagangApplicationByID(id uint) (*models.BimtekMagangApplication, e
 	return repositories.GetBimtekMagangApplicationByID(id)
 }
 
+func DeleteBimtekMagangApplication(id uint) error {
+	return repositories.DeleteBimtekMagangApplication(id)
+}
+
 func ReviewBimtekMagangApplication(id uint, verified bool, note string) error {
+	if verified {
+		return ErrBimtekMagangReplyLetterRequired
+	}
 	if !verified && note == "" {
 		return errors.New("alasan berkas tidak terverifikasi wajib diisi")
 	}
-	if verified {
-		note = ""
-	}
 	err := repositories.ReviewBimtekMagangApplication(id, verified, note, time.Now())
+	if errors.Is(err, repositories.ErrBimtekMagangApplicationStateConflict) {
+		return ErrBimtekMagangApplicationStateConflict
+	}
+	return err
+}
+
+func VerifyBimtekMagangApplicationWithReplyLetter(id uint, filePath string) error {
+	err := repositories.VerifyBimtekMagangApplicationWithReplyLetter(id, filePath, time.Now())
 	if errors.Is(err, repositories.ErrBimtekMagangApplicationStateConflict) {
 		return ErrBimtekMagangApplicationStateConflict
 	}

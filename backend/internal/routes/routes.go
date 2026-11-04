@@ -132,6 +132,8 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies) {
 				adminGroup.GET("/bimtek-magang", bimtekMagangHandler.GetAllApplications)
 				adminGroup.GET("/bimtek-magang/:id/documents/:document", bimtekMagangHandler.GetDocument)
 				adminGroup.PATCH("/bimtek-magang/:id/review", bimtekMagangHandler.Review)
+				adminGroup.POST("/bimtek-magang/:id/verify-with-reply-letter", bimtekMagangHandler.VerifyWithReplyLetter)
+				adminGroup.DELETE("/bimtek-magang/:id", bimtekMagangHandler.DeleteApplication)
 				adminGroup.POST("/bimtek-magang/:id/reply-letter", bimtekMagangHandler.SendReplyLetter)
 
 				adminGroup.GET("/feedbacks", feedbackHandler.GetAllFeedbacks)

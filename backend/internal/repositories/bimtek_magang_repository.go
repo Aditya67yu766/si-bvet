@@ -46,6 +46,17 @@ func GetBimtekMagangApplicationByID(id uint) (*models.BimtekMagangApplication, e
 	return &application, nil
 }
 
+func DeleteBimtekMagangApplication(id uint) error {
+	result := db.DB.Delete(&models.BimtekMagangApplication{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
 func ReviewBimtekMagangApplication(id uint, verified bool, note string, reviewedAt time.Time) error {
 	status := "Berkas Tidak Terverifikasi"
 	if verified {
@@ -57,6 +68,32 @@ func ReviewBimtekMagangApplication(id uint, verified bool, note string, reviewed
 			"status":      status,
 			"review_note": note,
 			"reviewed_at": reviewedAt,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		var count int64
+		if err := db.DB.Model(&models.BimtekMagangApplication{}).Where("id = ?", id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return ErrBimtekMagangApplicationStateConflict
+	}
+	return nil
+}
+
+func VerifyBimtekMagangApplicationWithReplyLetter(id uint, filePath string, reviewedAt time.Time) error {
+	result := db.DB.Model(&models.BimtekMagangApplication{}).
+		Where("id = ? AND status = ?", id, "Menunggu Verifikasi").
+		Updates(map[string]interface{}{
+			"status":        "Surat Balasan Terkirim",
+			"review_note":   "",
+			"reviewed_at":   reviewedAt,
+			"reply_letter":  filePath,
+			"reply_sent_at": reviewedAt,
 		})
 	if result.Error != nil {
 		return result.Error

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -209,6 +210,23 @@ func (h *BimtekMagangHandler) GetDocument(c *gin.Context) {
 	utils.DataResponse(c, http.StatusOK, "Dokumen siap dibuka.", gin.H{"url": resolvedLocation})
 }
 
+func (h *BimtekMagangHandler) DeleteApplication(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "ID pengajuan tidak valid.")
+		return
+	}
+	if err := services.DeleteBimtekMagangApplication(uint(id)); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.ErrorResponse(c, http.StatusNotFound, "Pengajuan tidak ditemukan.")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal menghapus pengajuan BIMTEK/Magang.")
+		return
+	}
+	utils.MessageResponse(c, http.StatusOK, "Pengajuan BIMTEK/Magang berhasil dihapus.")
+}
+
 func (h *BimtekMagangHandler) Review(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -225,6 +243,10 @@ func (h *BimtekMagangHandler) Review(c *gin.Context) {
 	}
 	if request.Verified == nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Status verifikasi wajib dipilih.")
+		return
+	}
+	if *request.Verified {
+		utils.ErrorResponse(c, http.StatusBadRequest, services.ErrBimtekMagangReplyLetterRequired.Error())
 		return
 	}
 	request.Note = strings.TrimSpace(request.Note)
@@ -244,6 +266,73 @@ func (h *BimtekMagangHandler) Review(c *gin.Context) {
 		return
 	}
 	utils.MessageResponse(c, http.StatusOK, "Verifikasi berkas berhasil disimpan.")
+}
+
+func (h *BimtekMagangHandler) VerifyWithReplyLetter(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "ID pengajuan tidak valid.")
+		return
+	}
+	application, err := services.GetBimtekMagangApplicationByID(uint(id))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.ErrorResponse(c, http.StatusNotFound, "Pengajuan tidak ditemukan.")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal memuat pengajuan.")
+		return
+	}
+	if application.Status != "Menunggu Verifikasi" {
+		utils.ErrorResponse(c, http.StatusConflict, services.ErrBimtekMagangApplicationStateConflict.Error())
+		return
+	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 12*1024*1024)
+	file, err := c.FormFile("reply_letter")
+	if err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			utils.ErrorResponse(c, http.StatusRequestEntityTooLarge, "Ukuran surat balasan maksimal 10 MB.")
+		} else {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Surat balasan PDF wajib diunggah bersama verifikasi.")
+		}
+		return
+	}
+	if file.Size == 0 || file.Size > maxBimtekMagangDocumentSize || strings.ToLower(filepath.Ext(file.Filename)) != ".pdf" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Surat balasan harus berupa PDF maksimal 10 MB.")
+		return
+	}
+	openedFile, err := file.Open()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Gagal membaca surat balasan.")
+		return
+	}
+	signature := make([]byte, 5)
+	_, readErr := io.ReadFull(openedFile, signature)
+	closeErr := openedFile.Close()
+	if readErr != nil || closeErr != nil || string(signature) != "%PDF-" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Isi surat balasan bukan dokumen PDF yang valid.")
+		return
+	}
+
+	filePath, err := h.fileStorage.SaveBimtekMagangDocument(c.Request.Context(), file)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal menyimpan surat balasan.")
+		return
+	}
+	if err := services.VerifyBimtekMagangApplicationWithReplyLetter(uint(id), filePath); err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			utils.ErrorResponse(c, http.StatusNotFound, "Pengajuan tidak ditemukan.")
+		case errors.Is(err, services.ErrBimtekMagangApplicationStateConflict):
+			utils.ErrorResponse(c, http.StatusConflict, err.Error())
+		default:
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal memverifikasi pengajuan dan mengirim surat balasan.")
+		}
+		return
+	}
+	utils.MessageResponse(c, http.StatusOK, "Pengajuan berhasil diverifikasi dan surat balasan dikirim kepada customer.")
 }
 
 func (h *BimtekMagangHandler) SendReplyLetter(c *gin.Context) {
