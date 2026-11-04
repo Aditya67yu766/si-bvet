@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -29,6 +31,9 @@ type DocumentStorage interface {
 	SaveLHUFile(ctx context.Context, fileHeader *multipart.FileHeader) (string, error)
 	SaveSampleTemplateFile(ctx context.Context, fileHeader *multipart.FileHeader) (string, error)
 	ResolveDownloadLocation(ctx context.Context, location string) (string, error)
+	SaveBimtekMagangPaymentProof(ctx context.Context, fileHeader *multipart.FileHeader) (string, error)
+	ReadBimtekMagangPaymentProof(ctx context.Context, location string) ([]byte, error)
+	DeleteBimtekMagangFiles(ctx context.Context, locations []string) (int, error)
 }
 
 type LocalDocumentStorage struct {
@@ -57,6 +62,10 @@ func (s *LocalDocumentStorage) SaveSubmissionAttachment(ctx context.Context, fil
 
 func (s *LocalDocumentStorage) SaveBillingProof(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
 	return s.saveMultipartFile(ctx, "billing-proofs", fileHeader)
+}
+
+func (s *LocalDocumentStorage) SaveBimtekMagangPaymentProof(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+	return s.saveMultipartFile(ctx, "bimtek-magang-payment-proofs", fileHeader)
 }
 
 func (s *LocalDocumentStorage) SaveComplaintAttachment(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
@@ -91,6 +100,112 @@ func (s *LocalDocumentStorage) ResolveDownloadLocation(ctx context.Context, loca
 	}
 
 	return location, nil
+}
+
+func (s *LocalDocumentStorage) ReadBimtekMagangPaymentProof(ctx context.Context, location string) ([]byte, error) {
+	_ = ctx
+	var relativePath string
+	switch {
+	case strings.HasPrefix(location, "/uploads/bimtek-magang-payment-proofs/"):
+		relativePath = strings.TrimPrefix(location, "/uploads/")
+	case strings.HasPrefix(location, "internal/uploads/bimtek-magang-payment-proofs/"):
+		relativePath = strings.TrimPrefix(filepath.ToSlash(location), "internal/uploads/")
+	default:
+		return nil, fmt.Errorf("invalid billing proof location")
+	}
+
+	cleanPath := filepath.Clean(filepath.FromSlash(relativePath))
+	if filepath.IsAbs(cleanPath) || strings.HasPrefix(cleanPath, ".."+string(filepath.Separator)) ||
+		!strings.HasPrefix(filepath.ToSlash(cleanPath), "bimtek-magang-payment-proofs"+"/") {
+		return nil, fmt.Errorf("invalid billing proof location")
+	}
+	filePath := filepath.Join(s.baseDir, cleanPath)
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Size() > 5*1024*1024 {
+		return nil, fmt.Errorf("invalid billing proof file")
+	}
+	return os.ReadFile(filePath)
+}
+
+func (s *LocalDocumentStorage) DeleteBimtekMagangFiles(ctx context.Context, locations []string) (int, error) {
+	_ = ctx
+	filePaths := make([]string, 0, len(locations))
+	for _, location := range locations {
+		filePath, err := s.localBimtekMagangFilePath(location)
+		if err != nil {
+			return len(locations), err
+		}
+		filePaths = append(filePaths, filePath)
+	}
+
+	failed := 0
+	var firstErr error
+	for _, filePath := range filePaths {
+		if err := os.Remove(filePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			failed++
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return failed, firstErr
+}
+
+func (s *LocalDocumentStorage) localBimtekMagangFilePath(location string) (string, error) {
+	var relativePath string
+	switch {
+	case strings.HasPrefix(location, "/uploads/"):
+		relativePath = strings.TrimPrefix(location, "/uploads/")
+	case strings.HasPrefix(filepath.ToSlash(location), "internal/uploads/"):
+		relativePath = strings.TrimPrefix(filepath.ToSlash(location), "internal/uploads/")
+	default:
+		return "", fmt.Errorf("invalid local BIMTEK/Magang file location")
+	}
+
+	cleanPath := filepath.Clean(filepath.FromSlash(relativePath))
+	normalizedPath := filepath.ToSlash(cleanPath)
+	if filepath.IsAbs(cleanPath) || strings.HasPrefix(normalizedPath, "../") ||
+		(normalizedPath != "bimtek-magang" && !strings.HasPrefix(normalizedPath, "bimtek-magang/")) &&
+			(normalizedPath != "bimtek-magang-payment-proofs" && !strings.HasPrefix(normalizedPath, "bimtek-magang-payment-proofs/")) {
+		return "", fmt.Errorf("invalid local BIMTEK/Magang file location")
+	}
+
+	baseDir, err := filepath.Abs(s.baseDir)
+	if err != nil {
+		return "", err
+	}
+	filePath := filepath.Join(baseDir, cleanPath)
+	relativeToBase, err := filepath.Rel(baseDir, filePath)
+	if err != nil || relativeToBase == ".." || strings.HasPrefix(relativeToBase, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("local BIMTEK/Magang file is outside the upload directory")
+	}
+	info, err := os.Lstat(filePath)
+	if errors.Is(err, os.ErrNotExist) {
+		return filePath, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("local BIMTEK/Magang upload is not a regular file")
+	}
+	resolvedBase, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		return "", err
+	}
+	resolvedFile, err := filepath.EvalSymlinks(filePath)
+	if err != nil {
+		return "", err
+	}
+	resolvedRelative, err := filepath.Rel(resolvedBase, resolvedFile)
+	if err != nil || resolvedRelative == ".." ||
+		strings.HasPrefix(resolvedRelative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("local BIMTEK/Magang file resolves outside the upload directory")
+	}
+	return filePath, nil
 }
 
 func (s *LocalDocumentStorage) saveMultipartFile(ctx context.Context, objectPrefix string, fileHeader *multipart.FileHeader) (string, error) {
@@ -207,6 +322,10 @@ func (s *GCSDocumentStorage) SaveBillingProof(ctx context.Context, fileHeader *m
 	return s.saveMultipartFile(ctx, "billing-proofs", fileHeader)
 }
 
+func (s *GCSDocumentStorage) SaveBimtekMagangPaymentProof(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+	return s.saveMultipartFile(ctx, "bimtek-magang-payment-proofs", fileHeader)
+}
+
 func (s *GCSDocumentStorage) SaveSubmissionAttachment(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
 	return s.saveMultipartFile(ctx, "submission-attachments", fileHeader)
 }
@@ -263,6 +382,62 @@ func (s *GCSDocumentStorage) ResolveDownloadLocation(ctx context.Context, locati
 	}
 
 	return url, nil
+}
+
+func (s *GCSDocumentStorage) ReadBimtekMagangPaymentProof(ctx context.Context, location string) ([]byte, error) {
+	bucketName, objectName, ok := parseGCSLocation(location)
+	if !ok || bucketName != s.bucketName || !strings.HasPrefix(objectName, "bimtek-magang-payment-proofs/") {
+		return nil, fmt.Errorf("invalid magang payment proof location")
+	}
+	reader, err := s.client.Bucket(bucketName).Object(objectName).NewReader(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	return readBillingProof(reader)
+}
+
+func (s *GCSDocumentStorage) DeleteBimtekMagangFiles(ctx context.Context, locations []string) (int, error) {
+	objectNames := make([]string, 0, len(locations))
+	for _, location := range locations {
+		bucketName, objectName, ok := parseGCSLocation(location)
+		if !ok || bucketName != s.bucketName || !isBimtekMagangObjectName(objectName) {
+			return len(locations), fmt.Errorf("invalid or unsupported GCS BIMTEK/Magang file location")
+		}
+		objectNames = append(objectNames, objectName)
+	}
+
+	failed := 0
+	var firstErr error
+	for _, objectName := range objectNames {
+		err := s.client.Bucket(s.bucketName).Object(objectName).Delete(ctx)
+		if err != nil && !errors.Is(err, storage.ErrObjectNotExist) {
+			failed++
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return failed, firstErr
+}
+
+func readBillingProof(reader io.Reader) ([]byte, error) {
+	content, err := io.ReadAll(io.LimitReader(reader, 5*1024*1024+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(content) > 5*1024*1024 {
+		return nil, fmt.Errorf("billing proof exceeds maximum size")
+	}
+	return content, nil
+}
+
+func isBimtekMagangObjectName(objectName string) bool {
+	if path.IsAbs(objectName) || path.Clean(objectName) != objectName {
+		return false
+	}
+	return strings.HasPrefix(objectName, "bimtek-magang/") ||
+		strings.HasPrefix(objectName, "bimtek-magang-payment-proofs/")
 }
 
 func (s *GCSDocumentStorage) signBytesWithIAM(b []byte) ([]byte, error) {

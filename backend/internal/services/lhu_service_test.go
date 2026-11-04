@@ -238,7 +238,7 @@ var _ = ginkgo.Describe("LHU Service", func() {
 			gomega.Expect(err).To(gomega.HaveOccurred())
 		})
 
-		ginkgo.It("should return error if LHU already exists", func() {
+		ginkgo.It("should replace an existing LHU", func() {
 			now := time.Now()
 
 			submission := &models.Submission{
@@ -257,10 +257,14 @@ var _ = ginkgo.Describe("LHU Service", func() {
 			err = UploadLHU(submission.ID, "LHU-2024-001", "internal/uploads/lhu/file.pdf")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			// Try to upload second LHU
+			// Re-upload replaces the existing LHU.
 			err = UploadLHU(submission.ID, "LHU-2024-002", "internal/uploads/lhu/file2.pdf")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			var updatedLHU models.LhuDocument
+			gomega.Expect(db.DB.First(&updatedLHU, "submission_id = ?", submission.ID).Error).NotTo(gomega.HaveOccurred())
+			gomega.Expect(updatedLHU.NoLhu).To(gomega.Equal("LHU-2024-002"))
+			gomega.Expect(updatedLHU.FilePath).To(gomega.Equal("internal/uploads/lhu/file2.pdf"))
 		})
 	})
 

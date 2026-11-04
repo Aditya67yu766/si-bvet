@@ -61,7 +61,7 @@ func GetBillingBySubmissionID(submissionID uint) (*models.Billing, error) {
 }
 
 func UpdateBilling(submissionID uint, code string, amount float64, noRegistration string, noEpi string) error {
-	return db.DB.Transaction(func(tx *gorm.DB) error {
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&models.Billing{}).
 			Where("submission_id = ?", submissionID).
 			Updates(map[string]interface{}{
@@ -80,9 +80,13 @@ func UpdateBilling(submissionID uint, code string, amount float64, noRegistratio
 			return err
 		}
 
-		LogSystemActivity(fmt.Sprintf("Billing diperbarui untuk submission ID %d dengan kode %s", submissionID, code))
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	LogSystemActivity(fmt.Sprintf("Billing diperbarui untuk submission ID %d dengan kode %s", submissionID, code))
+	return nil
 }
 
 func UploadBillingProof(submissionID uint, proofPath string) error {
@@ -116,18 +120,32 @@ func VerifyPayment(submissionID uint) error {
 func RejectPayment(submissionID uint) error {
 	err := db.DB.Transaction(func(tx *gorm.DB) error {
 		// Kosongkan bukti pembayaran dan set status kembali ke unpaid
-		if err := tx.Model(&models.Billing{}).
+		billingResult := tx.Model(&models.Billing{}).
 			Where("submission_id = ?", submissionID).
 			Updates(map[string]interface{}{
 				"proof_payment":  nil,
 				"payment_status": "unpaid",
-			}).Error; err != nil {
-			return err
+			})
+		if billingResult.Error != nil {
+			return billingResult.Error
+		}
+		if billingResult.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
 		}
 
-		return UpdateSubmissionStatusWithNotification(submissionID, "payment_rejected")
+		submissionResult := tx.Model(&models.Submission{}).
+			Where("id = ?", submissionID).
+			Update("process_status", "payment_rejected")
+		if submissionResult.Error != nil {
+			return submissionResult.Error
+		}
+		if submissionResult.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
 	})
 	if err == nil {
+		NotifySubmissionStatusChanged(submissionID, "payment_rejected")
 		LogSystemActivity(fmt.Sprintf("Pembayaran untuk submission ID %d ditolak", submissionID))
 	}
 	return err

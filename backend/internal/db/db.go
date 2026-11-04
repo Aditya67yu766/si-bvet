@@ -43,8 +43,12 @@ func InitDB() error {
 			&models.TestRequest{},
 			&models.ActivityLog{},
 			&models.BimtekMagangApplication{},
+			&models.BimtekMagangBilling{},
 		)
 		if err != nil {
+			return err
+		}
+		if err := dropLegacyBimtekMagangBillingColumns(DB); err != nil {
 			return err
 		}
 
@@ -88,12 +92,30 @@ func InitDB() error {
 		&models.TestRequest{},
 		&models.ActivityLog{},
 		&models.BimtekMagangApplication{},
+		&models.BimtekMagangBilling{},
 	)
 	if err != nil {
+		return err
+	}
+	if err := dropLegacyBimtekMagangBillingColumns(DB); err != nil {
 		return err
 	}
 
 	log.Println("Database connected & automigrate success")
 	return nil
 
+}
+
+func dropLegacyBimtekMagangBillingColumns(database *gorm.DB) error {
+	const table = "BimtekMagangBillings"
+	for _, column := range []string{"bank_name", "account_name", "account_number"} {
+		if !database.Migrator().HasColumn(table, column) {
+			continue
+		}
+		statement := `ALTER TABLE "` + table + `" DROP COLUMN "` + column + `"`
+		if err := database.Exec(statement).Error; err != nil {
+			return fmt.Errorf("drop legacy %s column from %s: %w", column, table, err)
+		}
+	}
+	return nil
 }

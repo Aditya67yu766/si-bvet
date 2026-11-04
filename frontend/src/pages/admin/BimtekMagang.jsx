@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   getBimtekMagangApplications,
   getBimtekMagangDocument,
@@ -8,6 +9,7 @@ import {
   sendBimtekMagangReplyLetter,
 } from "../../services/adminServices";
 import { resolveFileUrl } from "../../utils/fileUrl";
+import ActionAlert from "../../components/ActionAlert";
 
 const DOCUMENTS = [
   { key: "identity", label: "Identitas" },
@@ -29,11 +31,17 @@ export default function BimtekMagangApplications() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [downloading, setDownloading] = useState("");
   const [reviewNotes, setReviewNotes] = useState({});
   const [replyFiles, setReplyFiles] = useState({});
   const [actioning, setActioning] = useState("");
   const [search, setSearch] = useState("");
+  const [deletionTarget, setDeletionTarget] = useState(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deletionError, setDeletionError] = useState("");
+  const isSuperAdmin = useLocation().pathname.startsWith("/superadmin");
 
   const loadApplications = useCallback(async () => {
     try {
@@ -111,6 +119,7 @@ export default function BimtekMagangApplications() {
     const key = `${application.id}-review`;
     setActioning(key);
     setError("");
+    setSuccess("");
     try {
       let response;
       if (verified) {
@@ -121,7 +130,10 @@ export default function BimtekMagangApplications() {
         response = await reviewBimtekMagangApplication(application.id, { verified, note });
       }
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error ?? "Gagal menyimpan verifikasi dan surat balasan.");
+      if (!response.ok) throw new Error(json.error ?? "Gagal menyimpan verifikasi.");
+      setSuccess(verified
+        ? "Dokumen berhasil diverifikasi dan surat balasan tersimpan."
+        : "Status pengajuan diperbarui menjadi tidak terverifikasi.");
       setReviewNotes((current) => ({ ...current, [application.id]: "" }));
       setReplyFiles((current) => ({ ...current, [application.id]: null }));
       await loadApplications();
@@ -145,12 +157,14 @@ export default function BimtekMagangApplications() {
     const key = `${application.id}-reply`;
     setActioning(key);
     setError("");
+    setSuccess("");
     try {
       const formData = new FormData();
       formData.append("reply_letter", file);
       const response = await sendBimtekMagangReplyLetter(application.id, formData);
       const json = await response.json();
       if (!response.ok) throw new Error(json.error ?? "Gagal mengirim surat balasan.");
+      setSuccess("Surat balasan berhasil dikirim kepada pelanggan.");
       setReplyFiles((current) => ({ ...current, [application.id]: null }));
       await loadApplications();
     } catch (err) {
@@ -161,20 +175,45 @@ export default function BimtekMagangApplications() {
   };
 
   const deleteApplication = async (application) => {
-    if (!window.confirm("Yakin ingin menghapus pengajuan ini? Tindakan ini tidak dapat dibatalkan.")) {
-      return;
-    }
+    setDeletionTarget(application);
+    setDeletePassword("");
+    setDeleteReason("");
+    setDeletionError("");
+  };
+
+  const closeDeleteDialog = () => {
+    if (actioning) return;
+    setDeletionTarget(null);
+    setDeletePassword("");
+    setDeleteReason("");
+    setDeletionError("");
+  };
+
+  const confirmDeleteApplication = async (event) => {
+    event.preventDefault();
+    if (!deletionTarget) return;
+
+    const application = deletionTarget;
     const key = `${application.id}-delete`;
     setActioning(key);
-    setError("");
+    setDeletionError("");
+    setSuccess("");
     try {
-      const response = await deleteBimtekMagangApplication(application.id);
+      const response = await deleteBimtekMagangApplication(application.id, {
+        current_password: deletePassword,
+        reason: deleteReason.trim(),
+      });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error ?? "Gagal menghapus pengajuan.");
       setApplications((current) => current.filter((item) => item.id !== application.id));
+      setSuccess(json.message ?? "Pengajuan berhasil dihapus.");
+      setDeletionTarget(null);
+      setDeletePassword("");
+      setDeleteReason("");
     } catch (err) {
-      setError(err.message ?? "Gagal menghapus pengajuan.");
+      setDeletionError(err.message ?? "Gagal menghapus pengajuan.");
     } finally {
+      setDeletePassword("");
       setActioning("");
     }
   };
@@ -201,7 +240,8 @@ export default function BimtekMagangApplications() {
         <p className="mt-1 text-sm text-gray-500">Daftar permohonan customer beserta dokumen persyaratannya.</p>
       </header>
 
-      {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      <ActionAlert type="error" message={error} onClose={() => setError("")} />
+      <ActionAlert type="success" message={success} onClose={() => setSuccess("")} />
 
       <label className="block">
         <span className="sr-only">Cari pengajuan BIMTEK/Magang</span>
@@ -296,37 +336,60 @@ export default function BimtekMagangApplications() {
                       <td className="min-w-[240px] px-4 py-4">
                         <div className="space-y-3">
                           {application.status === "Menunggu Verifikasi" ? (
-                            <div className="space-y-2">
-                              <textarea value={reviewNotes[application.id] ?? ""}
-                                onChange={(event) => setReviewNotes((current) => ({
-                                  ...current,
-                                  [application.id]: event.target.value,
-                                }))}
-                                maxLength={2000}
-                                placeholder="Alasan jika berkas tidak terverifikasi"
-                                className="w-full rounded-lg border border-gray-300 p-2 text-xs focus:border-[#415F9D] focus:outline-none" />
-                              <label className="block text-xs font-semibold text-[#233B6E]">
-                                Surat balasan PDF (wajib saat verifikasi)
-                                <input type="file" accept=".pdf,application/pdf"
-                                  onChange={(event) => setReplyFiles((current) => ({
-                                    ...current,
-                                    [application.id]: event.target.files?.[0] ?? null,
-                                  }))}
-                                  className="mt-1 block w-full text-xs font-normal text-gray-600 file:mr-2 file:rounded-md file:border-0 file:bg-[#EEF0F8] file:px-2 file:py-1.5 file:font-semibold file:text-[#233B6E]" />
-                              </label>
-                              <div className="flex flex-wrap gap-2">
-                                <button type="button" disabled={actioning === `${application.id}-review`}
-                                  onClick={() => reviewApplication(application, true)}
-                                  className="rounded-lg bg-[#233B6E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a2d56] disabled:opacity-50">
-                                  Verifikasi
-                                </button>
-                                <button type="button" disabled={actioning === `${application.id}-review`}
-                                  onClick={() => reviewApplication(application, false)}
-                                  className="rounded-lg bg-[#F5C400] px-3 py-2 text-xs font-semibold text-[#233B6E] hover:bg-[#e0b300] disabled:opacity-50">
-                                  Tidak Terverifikasi
-                                </button>
-                              </div>
-                            </div>
+                            application.request_type === "magang" ? (
+                                <div className="space-y-2">
+                                  <Link to={`${isSuperAdmin ? "/superadmin" : "/admin"}/bimtek-magang/pembayaran`}
+                                    className="inline-flex rounded-lg bg-[#233B6E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a2d56]">
+                                    Kelola e-billing dan pembayaran
+                                  </Link>
+                                  <textarea value={reviewNotes[application.id] ?? ""}
+                                    onChange={(event) => setReviewNotes((current) => ({
+                                      ...current,
+                                      [application.id]: event.target.value,
+                                    }))}
+                                    maxLength={2000}
+                                    placeholder="Alasan jika berkas tidak terverifikasi"
+                                    className="w-full rounded-lg border border-gray-300 p-2 text-xs focus:border-[#415F9D] focus:outline-none" />
+                                  <button type="button" disabled={actioning === `${application.id}-review`}
+                                    onClick={() => reviewApplication(application, false)}
+                                    className="rounded-lg bg-[#F5C400] px-3 py-2 text-xs font-semibold text-[#233B6E] hover:bg-[#e0b300] disabled:opacity-50">
+                                    Tidak Terverifikasi
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <textarea value={reviewNotes[application.id] ?? ""}
+                                    onChange={(event) => setReviewNotes((current) => ({
+                                      ...current,
+                                      [application.id]: event.target.value,
+                                    }))}
+                                    maxLength={2000}
+                                    placeholder="Alasan jika berkas tidak terverifikasi"
+                                    className="w-full rounded-lg border border-gray-300 p-2 text-xs focus:border-[#415F9D] focus:outline-none" />
+                                  <label className="block text-xs font-semibold text-[#233B6E]">
+                                    Surat balasan PDF (wajib saat verifikasi)
+                                    <input type="file" accept=".pdf,application/pdf"
+                                      onChange={(event) => setReplyFiles((current) => ({
+                                        ...current,
+                                        [application.id]: event.target.files?.[0] ?? null,
+                                      }))}
+                                      className="mt-1 block w-full text-xs font-normal text-gray-600 file:mr-2 file:rounded-md file:border-0 file:bg-[#EEF0F8] file:px-2 file:py-1.5 file:font-semibold file:text-[#233B6E]" />
+                                  </label>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button type="button"
+                                      disabled={actioning === `${application.id}-review`}
+                                      onClick={() => reviewApplication(application, true)}
+                                      className="rounded-lg bg-[#233B6E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1a2d56] disabled:opacity-50">
+                                      Verifikasi
+                                    </button>
+                                    <button type="button" disabled={actioning === `${application.id}-review`}
+                                      onClick={() => reviewApplication(application, false)}
+                                      className="rounded-lg bg-[#F5C400] px-3 py-2 text-xs font-semibold text-[#233B6E] hover:bg-[#e0b300] disabled:opacity-50">
+                                      Tidak Terverifikasi
+                                    </button>
+                                  </div>
+                                </div>
+                              )
                           ) : application.status === "Berkas Terverifikasi" ? (
                             <div className="space-y-2">
                               <label className="block text-xs font-semibold text-[#233B6E]">
@@ -369,6 +432,54 @@ export default function BimtekMagangApplications() {
         className="rounded-lg border border-[#233B6E] px-4 py-2 text-sm font-semibold text-[#233B6E] hover:bg-[#EEF0F8] disabled:opacity-50">
         Muat ulang
       </button>
+      {deletionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeDeleteDialog();
+          }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="delete-application-title"
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 id="delete-application-title" className="text-lg font-bold text-red-800">
+              Hapus pengajuan secara permanen?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              Pengajuan #{deletionTarget.id}, tagihan/e-billing jika sudah terbit, bukti pembayaran, dan berkas terkait akan dihapus dari SI-BVET. Tindakan ini tidak membatalkan atau mengembalikan pembayaran pada kanal resmi.
+              {deletionTarget.billing?.payment_status === "paid" && " Tagihan tercatat sudah dibayar."}
+            </p>
+            <ActionAlert type="error" message={deletionError} />
+            <form className="mt-5 space-y-4" onSubmit={confirmDeleteApplication}>
+              <label className="block text-sm font-semibold text-gray-700">
+                Alasan penghapusan
+                <textarea value={deleteReason} onChange={(event) => setDeleteReason(event.target.value)}
+                  maxLength={500} required rows={3}
+                  placeholder="Contoh: permohonan duplikat berdasarkan permintaan pemohon"
+                  className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm font-normal focus:border-[#415F9D] focus:outline-none focus:ring-2 focus:ring-[#415F9D]/20" />
+              </label>
+              <label className="block text-sm font-semibold text-gray-700">
+                Password akun admin yang sedang login
+                <input type="password" value={deletePassword}
+                  onChange={(event) => setDeletePassword(event.target.value)}
+                  autoComplete="current-password" required
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm font-normal focus:border-[#415F9D] focus:outline-none focus:ring-2 focus:ring-[#415F9D]/20" />
+              </label>
+              <p className="text-xs text-gray-500">
+                Password diverifikasi terhadap akun Anda dan tidak disimpan dalam log. Aksi ini tercatat pada log aktivitas.
+              </p>
+              <div className="flex justify-end gap-3 pt-1">
+                <button type="button" disabled={Boolean(actioning)}
+                  onClick={closeDeleteDialog}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                  Batal
+                </button>
+                <button type="submit" disabled={Boolean(actioning) || !deletePassword || !deleteReason.trim()}
+                  className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50">
+                  {actioning === `${deletionTarget.id}-delete` ? "Menghapus..." : "Verifikasi dan hapus"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

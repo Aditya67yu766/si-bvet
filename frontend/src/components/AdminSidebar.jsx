@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { clearAuth } from "../utils/auth";
 import logo from "../assets/logo.png";
-​
+
 const NAV_ITEMS = [
   {
     to: "/admin/beranda",
@@ -17,6 +17,12 @@ const NAV_ITEMS = [
     to: "/admin/bimtek-magang",
     label: "Pengajuan BIMTEK/Magang",
     icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h8"/></svg>),
+    end: true,
+  },
+  {
+    to: "/admin/bimtek-magang/pembayaran",
+    label: "Pembayaran Magang",
+    icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 flex-shrink-0"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h3"/></svg>),
   },
   {
     to: "/admin/pengajuan-masuk",
@@ -49,15 +55,15 @@ const NAV_ITEMS = [
     icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 flex-shrink-0"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>),
   },
 ];
-​
+
 export default function AdminSidebar({ isOpen, onClose }) {
   const navigate = useNavigate();
-​
+
   const handleLogout = () => {
     clearAuth();
     navigate("/login", { replace: true });
   };
-​
+
   return (
     <>
       {/* Backdrop overlay — tampil di mobile saat sidebar terbuka */}
@@ -67,7 +73,7 @@ export default function AdminSidebar({ isOpen, onClose }) {
           className="fixed inset-0 bg-black/40 z-40 lg:hidden"
         />
       )}
-​
+
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-white
         border-r border-gray-100 shadow-lg
@@ -78,17 +84,17 @@ export default function AdminSidebar({ isOpen, onClose }) {
         ${isOpen ? "lg:w-64" : "lg:w-0"}
       `}>
       <div className="flex flex-col h-full w-64">
-​
+
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100">
           <img src={logo} alt="SI-BVET" className="h-8 w-auto object-contain flex-shrink-0" />
           <span className="font-bold text-[#233B6E] text-sm whitespace-nowrap">SI-BVET</span>
         </div>
-​
+
         {/* Nav items */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
           {NAV_ITEMS.map((item) => (
-            <NavLink key={item.to} to={item.to}
+            <NavLink key={item.to} to={item.to} end={item.end}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                  transition-all group
@@ -110,7 +116,7 @@ export default function AdminSidebar({ isOpen, onClose }) {
             </NavLink>
           ))}
         </nav>
-​
+
         {/* Keluar */}
         <div className="px-2 py-3 border-t border-gray-100">
           <button onClick={handleLogout}
@@ -125,7 +131,7 @@ export default function AdminSidebar({ isOpen, onClose }) {
             <span className="whitespace-nowrap">Keluar</span>
           </button>
         </div>
-​
+
       </div>
     </aside>
     </>

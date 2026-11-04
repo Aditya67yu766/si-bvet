@@ -264,6 +264,18 @@ func (m *MockTemplateStorage) ResolveDownloadLocation(ctx context.Context, locat
 	return m.resolveValue, m.resolveErr
 }
 
+func (m *MockTemplateStorage) SaveBimtekMagangPaymentProof(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+	return "", nil
+}
+
+func (m *MockTemplateStorage) ReadBimtekMagangPaymentProof(ctx context.Context, location string) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *MockTemplateStorage) DeleteBimtekMagangFiles(ctx context.Context, locations []string) (int, error) {
+	return 0, nil
+}
+
 func withUserID(userID uint) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("user_id", userID)
@@ -662,7 +674,7 @@ var _ = ginkgo.Describe("SubmissionHandler", func() {
 			mockService = &MockSubmissionService{}
 			mockStorage = &MockTemplateStorage{
 				saveResult:   "/uploads/submission-sample-templates/template.xlsx",
-				resolveValue: "/uploads/submission-sample-templates/template.xlsx",
+				resolveValue: "https://storage.example.test/submission-sample-templates/template.xlsx",
 			}
 			handler = handlers.NewSubmissionHandler(mockService, mockStorage)
 		})
@@ -687,7 +699,7 @@ var _ = ginkgo.Describe("SubmissionHandler", func() {
 			router.ServeHTTP(w, req)
 
 			gomega.Expect(w.Code).To(gomega.Equal(http.StatusFound))
-			gomega.Expect(w.Header().Get("Location")).To(gomega.Equal("/uploads/submission-sample-templates/template.xlsx"))
+			gomega.Expect(w.Header().Get("Location")).To(gomega.Equal("https://storage.example.test/submission-sample-templates/template.xlsx"))
 		})
 
 		ginkgo.It("uploads sample template successfully", func() {

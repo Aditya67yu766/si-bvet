@@ -48,6 +48,9 @@ func UpdateLHu(submissionID uint, noLhu string, filePath string, dateOfPub *time
 
 func UploadLHU(submissionID uint, noLHU, filePath string) error {
 	now := time.Now()
+	if _, err := repositories.GetSubmissionByID(submissionID); err != nil {
+		return err
+	}
 
 	// Cek apakah LHU sudah ada untuk submission ini (logika upsert)
 	existingLHU, err := repositories.GetLhuBySubmissionID(submissionID)

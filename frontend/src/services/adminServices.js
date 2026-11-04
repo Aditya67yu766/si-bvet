@@ -33,14 +33,34 @@ export const verifyBimtekMagangApplicationWithReplyLetter = (id, formData) =>
     body: formData,
   });
 
-export const deleteBimtekMagangApplication = (id) =>
-  apiFetch(`/admin/bimtek-magang/${id}`, { method: "DELETE" });
+export const deleteBimtekMagangApplication = (id, data) =>
+  apiFetch(`/admin/bimtek-magang/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
 
 export const sendBimtekMagangReplyLetter = (id, formData) =>
   apiFetch(`/admin/bimtek-magang/${id}/reply-letter`, {
     method: "POST",
     body: formData,
   });
+
+export const createBimtekMagangBilling = (id, ebillingCode) =>
+  apiFetch(`/admin/bimtek-magang/${id}/billing`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ebilling_code: ebillingCode }),
+  });
+
+export const getBimtekMagangPaymentProof = (id) =>
+  apiFetch(`/admin/bimtek-magang/${id}/payment-proof`);
+
+export const verifyBimtekMagangPayment = (id) =>
+  apiFetch(`/admin/bimtek-magang/${id}/payment/verify`, { method: "PATCH" });
+
+export const rejectBimtekMagangPayment = (id) =>
+  apiFetch(`/admin/bimtek-magang/${id}/payment/reject`, { method: "PATCH" });
 
 export const approveSubmission = (id) =>
   apiFetch(`/admin/submissions/${id}/approve`, { method: "PATCH" });

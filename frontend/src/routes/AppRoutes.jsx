@@ -58,6 +58,7 @@ import PenilaianKepuasan  from "../pages/customer/PenilaianKepuasan";
 import PengajuanUjiSampel from "../pages/customer/PengajuanUjiSampel";
 import CustomerBimtekMagang from "../pages/customer/BimtekMagang";
 import BimtekMagangApplications from "../pages/admin/BimtekMagang";
+import BimtekMagangBilling from "../pages/admin/BimtekMagangBilling";
 
 function PrivateRoute({ children, allowedRoles }) {
   const location = useLocation();
@@ -90,6 +91,7 @@ export default function AppRoutes() {
         <Route path="registrasi-pelanggan/:id"     element={<DetailPelanggan />} />
         <Route path="pengajuan-masuk"              element={<AdminPengajuanMasuk />} />
         <Route path="bimtek-magang"                element={<BimtekMagangApplications />} />
+        <Route path="bimtek-magang/pembayaran"     element={<BimtekMagangBilling />} />
         <Route path="pengajuan-masuk/detail/:id"   element={<AdminDetailPengajuan />} />
         <Route path="proses-pengujian"             element={<AdminProsesPengujian />} />
         <Route path="laporan-hasil-uji"            element={<AdminLaporanHasilUji />} />
@@ -109,6 +111,7 @@ export default function AppRoutes() {
         <Route path="registrasi-pelanggan/:id"     element={<SuperAdminDetailPelanggan />} />
         <Route path="pengajuan-masuk"              element={<SuperAdminPengajuanMasuk />} />
         <Route path="bimtek-magang"                element={<BimtekMagangApplications />} />
+        <Route path="bimtek-magang/pembayaran"     element={<BimtekMagangBilling />} />
         <Route path="pengajuan-masuk/detail/:id"   element={<SuperAdminDetailPengajuan />} />
         <Route path="proses-pengujian"             element={<SuperAdminProsesPengujian />} />
         <Route path="laporan-hasil-uji"            element={<SuperAdminLaporanHasilUji />} />

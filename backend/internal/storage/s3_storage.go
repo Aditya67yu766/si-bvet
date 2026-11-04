@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"os"
 	"strings"
@@ -81,6 +82,10 @@ func (s *S3DocumentStorage) SaveBillingProof(ctx context.Context, fileHeader *mu
 	return s.saveMultipartFile(ctx, "billing-proofs", fileHeader)
 }
 
+func (s *S3DocumentStorage) SaveBimtekMagangPaymentProof(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+	return s.saveMultipartFile(ctx, "bimtek-magang-payment-proofs", fileHeader)
+}
+
 func (s *S3DocumentStorage) SaveComplaintAttachment(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
 	return s.saveMultipartFile(ctx, "complaints", fileHeader)
 }
@@ -118,6 +123,56 @@ func (s *S3DocumentStorage) ResolveDownloadLocation(ctx context.Context, locatio
 	}
 
 	return presignReq.URL, nil
+}
+
+func (s *S3DocumentStorage) ReadBimtekMagangPaymentProof(ctx context.Context, location string) ([]byte, error) {
+	bucketName, objectKey, ok := parseS3Location(location)
+	if !ok || bucketName != s.bucketName || !strings.HasPrefix(objectKey, "bimtek-magang-payment-proofs/") {
+		return nil, fmt.Errorf("invalid magang payment proof location")
+	}
+	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &bucketName,
+		Key:    &objectKey,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer result.Body.Close()
+	content, err := io.ReadAll(io.LimitReader(result.Body, 5*1024*1024+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(content) > 5*1024*1024 {
+		return nil, fmt.Errorf("billing proof exceeds maximum size")
+	}
+	return content, nil
+}
+
+func (s *S3DocumentStorage) DeleteBimtekMagangFiles(ctx context.Context, locations []string) (int, error) {
+	objectKeys := make([]string, 0, len(locations))
+	for _, location := range locations {
+		bucketName, objectKey, ok := parseS3Location(location)
+		if !ok || bucketName != s.bucketName || !isBimtekMagangObjectName(objectKey) {
+			return len(locations), fmt.Errorf("invalid or unsupported S3 BIMTEK/Magang file location")
+		}
+		objectKeys = append(objectKeys, objectKey)
+	}
+
+	failed := 0
+	var firstErr error
+	for _, objectKey := range objectKeys {
+		_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: aws.String(s.bucketName),
+			Key:    aws.String(objectKey),
+		})
+		if err != nil {
+			failed++
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return failed, firstErr
 }
 
 func (s *S3DocumentStorage) saveMultipartFile(ctx context.Context, objectPrefix string, fileHeader *multipart.FileHeader) (string, error) {

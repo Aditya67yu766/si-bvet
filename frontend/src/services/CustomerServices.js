@@ -10,6 +10,12 @@ export const getMyBimtekMagangApplications = () =>
 export const getMyBimtekMagangReplyLetter = (id) =>
   apiFetch(`/customer/bimtek-magang/${id}/reply-letter`);
 
+export const uploadBimtekMagangPaymentProof = (id, formData) =>
+  apiFetch(`/customer/bimtek-magang/${id}/payment-proof`, {
+    method: "POST",
+    body: formData,
+  });
+
 export const createBimtekMagangApplication = (formData) =>
   apiFetch("/customer/bimtek-magang", {
     method: "POST",

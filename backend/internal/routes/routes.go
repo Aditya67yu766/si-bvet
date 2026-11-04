@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 
 	"si-bvet/internal/handlers"
@@ -46,6 +48,7 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies) {
 	// Serve uploaded files from the Docker volume mount point.
 	// This path must match LOCAL_UPLOAD_DIR and the volume mount in docker-compose.yml.
 	uploadDir := "/app/uploads"
+	r.Use(privateBillingProofGuard())
 	r.Static("/uploads", uploadDir)
 	r.Static("/api/uploads", uploadDir)
 
@@ -133,6 +136,10 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies) {
 				adminGroup.GET("/bimtek-magang/:id/documents/:document", bimtekMagangHandler.GetDocument)
 				adminGroup.PATCH("/bimtek-magang/:id/review", bimtekMagangHandler.Review)
 				adminGroup.POST("/bimtek-magang/:id/verify-with-reply-letter", bimtekMagangHandler.VerifyWithReplyLetter)
+				adminGroup.POST("/bimtek-magang/:id/billing", bimtekMagangHandler.CreateBilling)
+				adminGroup.GET("/bimtek-magang/:id/payment-proof", bimtekMagangHandler.GetPaymentProof)
+				adminGroup.PATCH("/bimtek-magang/:id/payment/verify", bimtekMagangHandler.VerifyPayment)
+				adminGroup.PATCH("/bimtek-magang/:id/payment/reject", bimtekMagangHandler.RejectPayment)
 				adminGroup.DELETE("/bimtek-magang/:id", bimtekMagangHandler.DeleteApplication)
 				adminGroup.POST("/bimtek-magang/:id/reply-letter", bimtekMagangHandler.SendReplyLetter)
 
@@ -158,6 +165,7 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies) {
 				customerGroup.POST("/submissions", submissionHandler.CreateSubmission)
 				customerGroup.POST("/bimtek-magang", bimtekMagangHandler.Create)
 				customerGroup.GET("/bimtek-magang/my", bimtekMagangHandler.GetMyApplications)
+				customerGroup.POST("/bimtek-magang/:id/payment-proof", bimtekMagangHandler.UploadPaymentProof)
 				customerGroup.GET("/bimtek-magang/:id/reply-letter", bimtekMagangHandler.GetMyReplyLetter)
 				customerGroup.GET("/submissions/samples/template", submissionHandler.DownloadSampleTemplate)
 				customerGroup.POST("/submissions/:submission_id/samples/import", submissionHandler.ImportSampleTemplate)
@@ -180,4 +188,23 @@ func RegisterRoutes(r *gin.Engine, deps Dependencies) {
 
 		api.GET("/ping", handlers.PingHandler)
 	}
+}
+
+func privateBillingProofGuard() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if isPrivateBillingProofPath(c.Request.URL.Path) {
+			c.AbortWithStatus(404)
+			return
+		}
+		c.Next()
+	}
+}
+
+func isPrivateBillingProofPath(path string) bool {
+	for _, prefix := range []string{"/uploads/bimtek-magang-payment-proofs/", "/api/uploads/bimtek-magang-payment-proofs/"} {
+		if path == strings.TrimSuffix(prefix, "/") || strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
 }

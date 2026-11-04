@@ -3,9 +3,13 @@ package handlers
 import (
 	"errors"
 	"io"
+	"log"
+	"mime"
 	"mime/multipart"
 	"net/http"
+	"path"
 	"path/filepath"
+	"si-bvet/internal/repositories"
 	"si-bvet/internal/services"
 	"si-bvet/internal/storage"
 	"si-bvet/internal/utils"
@@ -18,6 +22,7 @@ import (
 )
 
 const maxBimtekMagangDocumentSize = 10 * 1024 * 1024
+const maxBimtekMagangPaymentProofSize = 5 * 1024 * 1024
 
 type BimtekMagangHandler struct {
 	fileStorage storage.DocumentStorage
@@ -76,6 +81,17 @@ func (h *BimtekMagangHandler) Create(c *gin.Context) {
 	if startDate != nil && endDate != nil && endDate.Before(*startDate) {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Tanggal selesai tidak boleh sebelum tanggal mulai.")
 		return
+	}
+	if requestType == "magang" {
+		if startDate == nil || endDate == nil {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Tanggal mulai dan selesai wajib diisi untuk magang/penelitian.")
+			return
+		}
+		durationDays := int(endDate.Sub(*startDate).Hours()/24) + 1
+		if _, err := services.BimtekMagangTariff(durationDays); err != nil {
+			utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 
 	identity, err := h.requiredDocument(c, "identity_document")
@@ -157,6 +173,152 @@ func (h *BimtekMagangHandler) GetMyApplications(c *gin.Context) {
 	utils.DataResponse(c, http.StatusOK, "Daftar pengajuan berhasil dimuat.", applications)
 }
 
+func (h *BimtekMagangHandler) UploadPaymentProof(c *gin.Context) {
+	userID, err := GetUserID(c)
+	if err != nil {
+		RespondUserIDError(c, err)
+		return
+	}
+	id, err := parseBimtekMagangID(c)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "ID pengajuan tidak valid.")
+		return
+	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBimtekMagangPaymentProofSize+1024*1024)
+	file, err := c.FormFile("proof")
+	if err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			utils.ErrorResponse(c, http.StatusRequestEntityTooLarge, "Ukuran bukti pembayaran maksimal 5 MB.")
+		} else {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Bukti pembayaran wajib diunggah.")
+		}
+		return
+	}
+	if err := validateBimtekMagangPaymentProof(file); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := services.ValidateBimtekMagangPaymentUpload(id, userID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.ErrorResponse(c, http.StatusNotFound, "Pengajuan atau tagihan tidak ditemukan.")
+		} else if errors.Is(err, repositories.ErrBimtekMagangPaymentStateConflict) {
+			utils.ErrorResponse(c, http.StatusConflict, err.Error())
+		} else {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal memeriksa status tagihan.")
+		}
+		return
+	}
+
+	proofPath, err := h.fileStorage.SaveBimtekMagangPaymentProof(c.Request.Context(), file)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal menyimpan bukti pembayaran.")
+		return
+	}
+	if err := services.UploadBimtekMagangPaymentProof(id, userID, proofPath); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.ErrorResponse(c, http.StatusNotFound, "Pengajuan tidak ditemukan.")
+		} else if errors.Is(err, repositories.ErrBimtekMagangPaymentStateConflict) {
+			utils.ErrorResponse(c, http.StatusConflict, err.Error())
+		} else {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal menyimpan bukti pembayaran.")
+		}
+		return
+	}
+	utils.MessageResponse(c, http.StatusOK, "Bukti pembayaran berhasil diunggah dan menunggu verifikasi.")
+}
+
+func (h *BimtekMagangHandler) CreateBilling(c *gin.Context) {
+	id, err := parseBimtekMagangID(c)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "ID pengajuan tidak valid.")
+		return
+	}
+	var request struct {
+		EBillingCode string `json:"ebilling_code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Kode e-billing wajib diisi.")
+		return
+	}
+	if err := services.CreateBimtekMagangBilling(id, request.EBillingCode); err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			utils.ErrorResponse(c, http.StatusNotFound, "Pengajuan tidak ditemukan.")
+		case errors.Is(err, repositories.ErrBimtekMagangPaymentStateConflict):
+			utils.ErrorResponse(c, http.StatusConflict, err.Error())
+		default:
+			utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		}
+		return
+	}
+	utils.MessageResponse(c, http.StatusCreated, "Tagihan magang/penelitian berhasil dibuat.")
+}
+
+func (h *BimtekMagangHandler) VerifyPayment(c *gin.Context) {
+	id, err := parseBimtekMagangID(c)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "ID pengajuan tidak valid.")
+		return
+	}
+	if err := services.VerifyBimtekMagangPayment(id); err != nil {
+		if errors.Is(err, repositories.ErrBimtekMagangPaymentStateConflict) {
+			utils.ErrorResponse(c, http.StatusConflict, err.Error())
+		} else {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal memverifikasi pembayaran.")
+		}
+		return
+	}
+	utils.MessageResponse(c, http.StatusOK, "Pembayaran terverifikasi. Surat balasan kini dapat dikirim.")
+}
+
+func (h *BimtekMagangHandler) RejectPayment(c *gin.Context) {
+	id, err := parseBimtekMagangID(c)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "ID pengajuan tidak valid.")
+		return
+	}
+	if err := services.RejectBimtekMagangPayment(id); err != nil {
+		if errors.Is(err, repositories.ErrBimtekMagangPaymentStateConflict) {
+			utils.ErrorResponse(c, http.StatusConflict, err.Error())
+		} else {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal menolak pembayaran.")
+		}
+		return
+	}
+	utils.MessageResponse(c, http.StatusOK, "Pembayaran ditolak. Pelanggan dapat mengunggah bukti baru.")
+}
+
+func (h *BimtekMagangHandler) GetPaymentProof(c *gin.Context) {
+	id, err := parseBimtekMagangID(c)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "ID pengajuan tidak valid.")
+		return
+	}
+	proofPath, err := services.GetBimtekMagangPaymentProof(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.ErrorResponse(c, http.StatusNotFound, "Bukti pembayaran belum tersedia.")
+		} else {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal memuat bukti pembayaran.")
+		}
+		return
+	}
+	content, err := h.fileStorage.ReadBimtekMagangPaymentProof(c.Request.Context(), proofPath)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal menyiapkan bukti pembayaran.")
+		return
+	}
+	contentType := mime.TypeByExtension(strings.ToLower(path.Ext(proofPath)))
+	if contentType != "application/pdf" && contentType != "image/jpeg" && contentType != "image/png" {
+		contentType = "application/octet-stream"
+	}
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Content-Disposition", "inline")
+	c.Data(http.StatusOK, contentType, content)
+}
+
 func (h *BimtekMagangHandler) GetAllApplications(c *gin.Context) {
 	applications, err := services.GetAllBimtekMagangApplications()
 	if err != nil {
@@ -216,15 +378,86 @@ func (h *BimtekMagangHandler) DeleteApplication(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, "ID pengajuan tidak valid.")
 		return
 	}
-	if err := services.DeleteBimtekMagangApplication(uint(id)); err != nil {
+
+	userID, err := GetUserID(c)
+	if err != nil {
+		RespondUserIDError(c, err)
+		return
+	}
+	role, err := GetRole(c)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusUnauthorized, "Sesi admin tidak valid.")
+		return
+	}
+	if role != "admin" && role != "superadmin" {
+		utils.ErrorResponse(c, http.StatusForbidden, "Hanya admin atau superadmin yang dapat menghapus pengajuan.")
+		return
+	}
+
+	var request struct {
+		CurrentPassword string `json:"current_password"`
+		Reason          string `json:"reason"`
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4*1024)
+	if err := c.ShouldBindJSON(&request); err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			utils.ErrorResponse(c, http.StatusRequestEntityTooLarge, "Ukuran permintaan penghapusan terlalu besar.")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Password akun dan alasan penghapusan wajib diisi.")
+		return
+	}
+	request.Reason = strings.TrimSpace(request.Reason)
+	if request.CurrentPassword == "" || request.Reason == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Password akun dan alasan penghapusan wajib diisi.")
+		return
+	}
+	if len(request.Reason) > 500 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Alasan penghapusan maksimal 500 karakter.")
+		return
+	}
+	if err := services.ReauthenticateBimtekMagangDeletion(userID, role, request.CurrentPassword); err != nil {
+		if errors.Is(err, services.ErrBimtekMagangDeleteReauthenticationFailed) {
+			utils.ErrorResponse(c, http.StatusUnauthorized, "Password akun tidak valid atau sesi admin sudah tidak aktif.")
+		} else {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal memverifikasi ulang akun admin.")
+		}
+		return
+	}
+
+	fileLocations, err := services.DeleteBimtekMagangApplicationWithAudit(
+		uint(id), userID, role, request.Reason, c.ClientIP(), c.Request.Method, c.FullPath(),
+	)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			utils.ErrorResponse(c, http.StatusNotFound, "Pengajuan tidak ditemukan.")
+			return
+		}
+		if errors.Is(err, repositories.ErrBimtekMagangDeleteActorNotAuthorized) {
+			utils.ErrorResponse(c, http.StatusUnauthorized, "Sesi admin sudah tidak aktif. Silakan masuk kembali.")
+			return
+		}
+		if errors.Is(err, repositories.ErrBimtekMagangApplicationFilesShared) {
+			utils.ErrorResponse(c, http.StatusConflict, "Berkas pengajuan digunakan oleh data lain sehingga tidak dapat dihapus dengan aman.")
 			return
 		}
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Gagal menghapus pengajuan BIMTEK/Magang.")
 		return
 	}
-	utils.MessageResponse(c, http.StatusOK, "Pengajuan BIMTEK/Magang berhasil dihapus.")
+
+	pendingFiles, cleanupErr := h.fileStorage.DeleteBimtekMagangFiles(c.Request.Context(), fileLocations)
+	if cleanupErr != nil || pendingFiles > 0 {
+		log.Printf("[ERROR] BIMTEK/Magang application %d deleted, but %d associated file(s) could not be removed: %v", id, pendingFiles, cleanupErr)
+		utils.DataResponse(
+			c,
+			http.StatusOK,
+			"Pengajuan dan tagihan berhasil dihapus, tetapi sebagian berkas belum berhasil dibersihkan. Hubungi administrator.",
+			gin.H{"file_cleanup_pending": pendingFiles},
+		)
+		return
+	}
+	utils.MessageResponse(c, http.StatusOK, "Pengajuan, tagihan, dan berkas BIMTEK/Magang berhasil dihapus.")
 }
 
 func (h *BimtekMagangHandler) Review(c *gin.Context) {
@@ -285,6 +518,10 @@ func (h *BimtekMagangHandler) VerifyWithReplyLetter(c *gin.Context) {
 	}
 	if application.Status != "Menunggu Verifikasi" {
 		utils.ErrorResponse(c, http.StatusConflict, services.ErrBimtekMagangApplicationStateConflict.Error())
+		return
+	}
+	if application.RequestType == "magang" {
+		utils.ErrorResponse(c, http.StatusConflict, "Buat tagihan dan verifikasi pembayaran sebelum mengirim surat balasan.")
 		return
 	}
 
@@ -394,6 +631,7 @@ func (h *BimtekMagangHandler) GetMyReplyLetter(c *gin.Context) {
 		RespondUserIDError(c, err)
 		return
 	}
+
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "ID pengajuan tidak valid.")
@@ -426,4 +664,38 @@ func parseOptionalApplicationDate(value string) (*time.Time, error) {
 		return nil, err
 	}
 	return &date, nil
+}
+
+func parseBimtekMagangID(c *gin.Context) (uint, error) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	return uint(id), err
+}
+
+func validateBimtekMagangPaymentProof(file *multipart.FileHeader) error {
+	if file.Size == 0 || file.Size > maxBimtekMagangPaymentProofSize {
+		return errors.New("bukti pembayaran harus berukuran maksimal 5 MB.")
+	}
+	extension := strings.ToLower(filepath.Ext(file.Filename))
+	if extension != ".pdf" && extension != ".jpg" && extension != ".jpeg" && extension != ".png" {
+		return errors.New("format bukti pembayaran harus PDF, JPG, atau PNG.")
+	}
+
+	openedFile, err := file.Open()
+	if err != nil {
+		return errors.New("Gagal membaca bukti pembayaran.")
+	}
+	header := make([]byte, 512)
+	n, readErr := openedFile.Read(header)
+	closeErr := openedFile.Close()
+	if (readErr != nil && n == 0) || closeErr != nil {
+		return errors.New("Gagal membaca bukti pembayaran.")
+	}
+	contentType := http.DetectContentType(header[:n])
+	validType := extension == ".pdf" && strings.HasPrefix(contentType, "application/pdf") ||
+		(extension == ".jpg" || extension == ".jpeg") && strings.HasPrefix(contentType, "image/jpeg") ||
+		extension == ".png" && strings.HasPrefix(contentType, "image/png")
+	if !validType {
+		return errors.New("Isi file bukti pembayaran tidak cocok dengan format yang diizinkan.")
+	}
+	return nil
 }

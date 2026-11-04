@@ -53,6 +53,18 @@ func (f failingDocumentStorage) ResolveDownloadLocation(ctx context.Context, loc
 	return "", http.ErrAbortHandler
 }
 
+func (f failingDocumentStorage) SaveBimtekMagangPaymentProof(ctx context.Context, fileHeader *multipart.FileHeader) (string, error) {
+	return "", nil
+}
+
+func (f failingDocumentStorage) ReadBimtekMagangPaymentProof(ctx context.Context, location string) ([]byte, error) {
+	return nil, http.ErrAbortHandler
+}
+
+func (f failingDocumentStorage) DeleteBimtekMagangFiles(ctx context.Context, locations []string) (int, error) {
+	return 0, nil
+}
+
 type MockAdminService struct {
 	createCalled bool
 	createReq    dto.AdminRequest
