@@ -42,6 +42,17 @@ function PaginationBtn({ children, active, disabled, onClick }) {
   );
 }
 ​
+function FormField({ label, children }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        {label}<span className="text-red-400 ml-0.5">*</span>
+      </span>
+      {children}
+    </label>
+  );
+}
+
 function FormTambahPelanggan({ onBack, onSuccess }) {
   const [form, setForm] = useState({
     fullname: "", email: "", phone: "",
@@ -83,14 +94,6 @@ function FormTambahPelanggan({ onBack, onSuccess }) {
 ​
   const inputCls =
     "w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:ring-2 focus:ring-[#233B6E]/25 focus:border-[#233B6E]";
-  const F = ({ label, children }) => (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-        {label}<span className="text-red-400 ml-0.5">*</span>
-      </span>
-      {children}
-    </label>
-  );
 ​
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -121,30 +124,30 @@ function FormTambahPelanggan({ onBack, onSuccess }) {
         )}
 ​
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <F label="Nama Lengkap">
+          <FormField label="Nama Lengkap">
             <input value={form.fullname} onChange={set("fullname")}
               placeholder="Masukkan nama lengkap" className={inputCls} />
-          </F>
-          <F label="Email">
+          </FormField>
+          <FormField label="Email">
             <input type="email" value={form.email} onChange={set("email")}
               placeholder="nama@email.com" className={inputCls} />
-          </F>
-          <F label="No. Telepon">
+          </FormField>
+          <FormField label="No. Telepon">
             <input value={form.phone} onChange={set("phone")}
               placeholder="08XXXXXXXXXX" className={inputCls} />
-          </F>
-          <F label="Instansi">
+          </FormField>
+          <FormField label="Instansi">
             <input value={form.institution} onChange={set("institution")}
               placeholder="Nama instansi" className={inputCls} />
-          </F>
-          <F label="Kata Sandi">
+          </FormField>
+          <FormField label="Kata Sandi">
             <input type="password" value={form.password} onChange={set("password")}
               placeholder="Minimal 8 karakter" className={inputCls} />
-          </F>
-          <F label="Konfirmasi Kata Sandi">
+          </FormField>
+          <FormField label="Konfirmasi Kata Sandi">
             <input type="password" value={form.confirmPassword}
               onChange={set("confirmPassword")} placeholder="Ulangi kata sandi" className={inputCls} />
-          </F>
+          </FormField>
         </div>
 ​
         <div className="flex justify-end pt-2">

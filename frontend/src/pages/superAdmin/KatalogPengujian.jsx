@@ -28,6 +28,47 @@ function PBtn({ children, active, disabled, onClick }) {
   );
 }
 
+function Field({ form, set, label, k, placeholder, type = "text", required = true }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-semibold text-[#233B6E]">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      <input type={type} value={form[k] ?? ""} onChange={set(k)}
+        placeholder={placeholder ?? `Masukkan ${label}`}
+        className="border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none
+          transition focus:ring-2 focus:ring-[#233B6E]/25 focus:border-[#233B6E]
+          placeholder-gray-400" />
+    </div>
+  );
+}
+
+function SelectField({ form, set, label, k, options }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-semibold text-[#233B6E]">
+        {label}<span className="text-red-500 ml-0.5">*</span>
+      </label>
+      <div className="relative">
+        <select value={form[k] ?? ""} onChange={set(k)}
+          className="w-full appearance-none border border-gray-300 rounded-xl
+            px-3 py-2.5 text-sm outline-none bg-white pr-9
+            focus:ring-2 focus:ring-[#233B6E]/25 focus:border-[#233B6E]
+            text-gray-800">
+          <option value="">Pilih {label}</option>
+          {options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          strokeLinecap="round"
+          className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2
+            text-gray-400 pointer-events-none">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 /* Halaman Form */
 function FormPage({ initial, onBack, onSaved }) {
   const isEdit  = !!initial?.id;
@@ -75,43 +116,6 @@ function FormPage({ initial, onBack, onSaved }) {
     }
   };
 
-  const Field = ({ label, k, placeholder, type = "text", required = true }) => (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-semibold text-[#233B6E]">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      <input type={type} value={form[k] ?? ""} onChange={set(k)}
-        placeholder={placeholder ?? `Masukkan ${label}`}
-        className="border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none
-          transition focus:ring-2 focus:ring-[#233B6E]/25 focus:border-[#233B6E]
-          placeholder-gray-400" />
-    </div>
-  );
-
-  const SelectField = ({ label, k, options }) => (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-semibold text-[#233B6E]">
-        {label}<span className="text-red-500 ml-0.5">*</span>
-      </label>
-      <div className="relative">
-        <select value={form[k] ?? ""} onChange={set(k)}
-          className="w-full appearance-none border border-gray-300 rounded-xl
-            px-3 py-2.5 text-sm outline-none bg-white pr-9
-            focus:ring-2 focus:ring-[#233B6E]/25 focus:border-[#233B6E]
-            text-gray-800">
-          <option value="">Pilih {label}</option>
-          {options.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-          strokeLinecap="round"
-          className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2
-            text-gray-400 pointer-events-none">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </div>
-    </div>
-  );
-
   return (
     <div className="max-w-2xl mx-auto space-y-5">
 
@@ -137,21 +141,21 @@ function FormPage({ initial, onBack, onSaved }) {
               text-sm rounded-xl px-4 py-3">{error}</div>
           )}
 
-          <Field label="Nama Pengujian"   k="test_name" />
-          <SelectField label="Unit Lab"   k="unit_lab"   options={UNIT_LABS} />
+          <Field form={form} set={set} label="Nama Pengujian"   k="test_name" />
+          <SelectField form={form} set={set} label="Unit Lab"   k="unit_lab"   options={UNIT_LABS} />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Field label="Target"          k="target" />
-            <Field label="Metode"          k="method" />
+            <Field form={form} set={set} label="Target"          k="target" />
+            <Field form={form} set={set} label="Metode"          k="method" />
           </div>
 
-          <Field label="Tipe Hasil"        k="result_type"
+          <Field form={form} set={set} label="Tipe Hasil"        k="result_type"
             placeholder="cth: Kualitatif / Kuantitatif" />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Field label="Harga Uji"       k="price"    type="number"
+            <Field form={form} set={set} label="Harga Uji"       k="price"    type="number"
               placeholder="Masukkan nominal harga" />
-            <Field label="Durasi Pengujian" k="duration"
+            <Field form={form} set={set} label="Durasi Pengujian" k="duration"
               placeholder="cth: 3 Hari" />
           </div>
 
