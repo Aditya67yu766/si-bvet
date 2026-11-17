@@ -30,7 +30,11 @@ function getTariffEstimate(startDate, endDate) {
   if (!startDate || !endDate) return null;
   const start = Date.parse(`${startDate.slice(0, 10)}T00:00:00Z`);
   const end = Date.parse(`${endDate.slice(0, 10)}T00:00:00Z`);
-  const durationDays = Math.floor((end - start) / 86400000) + 1;
+  let durationDays = 0;
+  for (let day = start; day <= end; day += 86400000) {
+    const weekday = new Date(day).getUTCDay();
+    if (weekday !== 0 && weekday !== 6) durationDays += 1;
+  }
   let amount = null;
   if (durationDays >= 1 && durationDays <= 7) amount = 200000;
   else if (durationDays <= 14 && durationDays >= 8) amount = 300000;
@@ -261,7 +265,7 @@ export default function BimtekMagangBilling() {
                         </div>
                         {estimate && (
                           <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#415F9D]">Estimasi tarif · {estimate.durationDays} hari</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#415F9D]">Estimasi tarif · {estimate.durationDays} hari kerja</p>
                             <p className="mt-0.5 text-lg font-extrabold text-[#233B6E]">
                               {estimate.amount === null ? "Durasi di luar tarif" : formatRupiah(estimate.amount)}
                             </p>
@@ -315,7 +319,7 @@ export default function BimtekMagangBilling() {
                               type="button"
                               disabled={actioning === `${application.id}-payment`}
                               onClick={() => setPaymentReview({ application, verified: true })}
-                              className="rounded-lg bg-green-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                              className="rounded-lg bg-blue-950 hover:bg-blue-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
                             >
                               Verifikasi pembayaran
                             </button>

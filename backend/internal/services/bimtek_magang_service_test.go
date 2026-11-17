@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestReviewBimtekMagangApplicationRequiresNoteWhenNotVerified(t *testing.T) {
@@ -47,6 +48,36 @@ func TestBimtekMagangTariff(t *testing.T) {
 			}
 			if !test.valid && err == nil {
 				t.Fatalf("expected %d days to be rejected", test.days)
+			}
+		})
+	}
+}
+
+func TestBimtekMagangDurationDaysExcludesWeekends(t *testing.T) {
+	tests := []struct {
+		name     string
+		start    string
+		end      string
+		expected int
+	}{
+		{name: "weekday range spanning weekend", start: "2026-11-16", end: "2026-11-22", expected: 5},
+		{name: "weekend only", start: "2026-11-21", end: "2026-11-22", expected: 0},
+		{name: "single weekday", start: "2026-11-20", end: "2026-11-20", expected: 1},
+		{name: "range ending before start", start: "2026-11-23", end: "2026-11-22", expected: 0},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			start, err := time.Parse("2006-01-02", test.start)
+			if err != nil {
+				t.Fatal(err)
+			}
+			end, err := time.Parse("2006-01-02", test.end)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := BimtekMagangDurationDays(start, end); got != test.expected {
+				t.Fatalf("expected %d working days, got %d", test.expected, got)
 			}
 		})
 	}

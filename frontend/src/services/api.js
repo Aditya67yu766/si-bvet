@@ -12,7 +12,11 @@ export async function apiFetch(path, options = {}) {
   const headers = { ...(options.headers ?? {}) };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    cache: "no-store",
+    headers,
+  });
 
   if (res.status === 401) {
     clearAuth();

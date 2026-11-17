@@ -87,7 +87,7 @@ func (h *BimtekMagangHandler) Create(c *gin.Context) {
 			utils.ErrorResponse(c, http.StatusBadRequest, "Tanggal mulai dan selesai wajib diisi untuk magang/penelitian.")
 			return
 		}
-		durationDays := int(endDate.Sub(*startDate).Hours()/24) + 1
+		durationDays := services.BimtekMagangDurationDays(*startDate, *endDate)
 		if _, err := services.BimtekMagangTariff(durationDays); err != nil {
 			utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
 			return

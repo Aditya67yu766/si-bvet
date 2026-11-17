@@ -9,6 +9,18 @@ import (
 	"si-bvet/internal/repositories"
 )
 
+func BimtekMagangDurationDays(startDate, endDate time.Time) int {
+	start := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
+	end := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 0, 0, 0, 0, time.UTC)
+	durationDays := 0
+	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
+		if day.Weekday() != time.Saturday && day.Weekday() != time.Sunday {
+			durationDays++
+		}
+	}
+	return durationDays
+}
+
 func BimtekMagangTariff(durationDays int) (int64, error) {
 	switch {
 	case durationDays >= 1 && durationDays <= 7:
@@ -41,9 +53,7 @@ func CreateBimtekMagangBilling(applicationID uint, ebillingCode string) error {
 		return errors.New("tanggal magang/penelitian belum lengkap")
 	}
 
-	startDate := time.Date(application.StartDate.Year(), application.StartDate.Month(), application.StartDate.Day(), 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(application.EndDate.Year(), application.EndDate.Month(), application.EndDate.Day(), 0, 0, 0, 0, time.UTC)
-	durationDays := int(endDate.Sub(startDate).Hours()/24) + 1
+	durationDays := BimtekMagangDurationDays(*application.StartDate, *application.EndDate)
 	amount, err := BimtekMagangTariff(durationDays)
 	if err != nil {
 		return err

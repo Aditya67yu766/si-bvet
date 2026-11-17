@@ -28,6 +28,10 @@ func NewRouter() *gin.Engine {
 	submissionHandler := handlers.NewSubmissionHandler(services.NewSubmissionService(), uploadStorage)
 
 	r := gin.Default()
+	r.Use(func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.Next()
+	})
 
 	allowedOrigins := []string{
 		"http://localhost:3000",

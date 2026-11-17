@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import InputField from "../../components/InputField";
-import { saveAuth, getDashboardPath } from "../../utils/auth";
+import { clearAuth, saveAuth, getDashboardPath } from "../../utils/auth";
 import logo from "../../assets/logo.png";
 
 function EyeIcon({ open }) {
@@ -49,8 +49,10 @@ export default function LoginPage() {
     setErrors({});
     setLoading(true);
     try {
+      clearAuth();
       const res = await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: form.email, password: form.password }),
       });

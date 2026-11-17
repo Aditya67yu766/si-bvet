@@ -31,7 +31,12 @@ function durationInDays(start, end) {
   if (!start || !end) return null;
   const startTime = Date.parse(`${start}T00:00:00Z`);
   const endTime = Date.parse(`${end}T00:00:00Z`);
-  return Math.floor((endTime - startTime) / 86400000) + 1;
+  let durationDays = 0;
+  for (let day = startTime; day <= endTime; day += 86400000) {
+    const weekday = new Date(day).getUTCDay();
+    if (weekday !== 0 && weekday !== 6) durationDays += 1;
+  }
+  return durationDays;
 }
 
 function rupiah(value) {
@@ -292,7 +297,7 @@ export default function BimtekMagang() {
               </div>
               {plannedTariff ? (
                 <div className="rounded-xl bg-white/10 px-4 py-2 text-left sm:text-right">
-                  <p className="text-[11px] text-white/70">Estimasi {plannedDuration} hari</p>
+                  <p className="text-[11px] text-white/70">Estimasi {plannedDuration} hari kerja</p>
                   <p className="text-xl font-extrabold">{rupiah(plannedTariff)}</p>
                 </div>
               ) : (
@@ -324,7 +329,7 @@ export default function BimtekMagang() {
               ))}
             </div>
             <p className="border-t border-gray-100 px-4 py-3 text-xs leading-5 text-gray-500 sm:px-5">
-              Tarif mengacu pada Peraturan Menteri Pertanian RI Nomor 29/PERMENTAN/KU.030/8/2017. Tagihan resmi diterbitkan setelah berkas diverifikasi. Durasi menghitung tanggal mulai dan selesai; nominal final ditetapkan sistem.
+              Tarif mengacu pada Peraturan Menteri Pertanian RI Nomor 29/PERMENTAN/KU.030/8/2017. Tagihan resmi diterbitkan setelah berkas diverifikasi. Durasi menghitung hari kerja (Senin–Jumat), tidak termasuk Sabtu dan Minggu; nominal final ditetapkan sistem.
             </p>
           </div>
         )}
